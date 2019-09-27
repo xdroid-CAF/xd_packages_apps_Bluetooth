@@ -430,9 +430,10 @@ public class AvrcpControllerService extends ProfileService {
         if (stateMachine != null) {
             PlayerApplicationSettings supportedSettings =
                     PlayerApplicationSettings.makeSupportedSettings(playerAttribRsp);
+            stateMachine.sendMessage(
+                    AvrcpControllerStateMachine.MESSAGE_PROCESS_SUPPORTED_APPLICATION_SETTINGS,
+                    supportedSettings);
         }
-        /* Do nothing */
-
     }
 
     private synchronized void onPlayerAppSettingChanged(byte[] address, byte[] playerAttribRsp,
@@ -444,10 +445,12 @@ public class AvrcpControllerService extends ProfileService {
         AvrcpControllerStateMachine stateMachine = getStateMachine(device);
         if (stateMachine != null) {
 
-            PlayerApplicationSettings desiredSettings =
+            PlayerApplicationSettings currentSettings =
                     PlayerApplicationSettings.makeSettings(playerAttribRsp);
+            stateMachine.sendMessage(
+                    AvrcpControllerStateMachine.MESSAGE_PROCESS_CURRENT_APPLICATION_SETTINGS,
+                    currentSettings);
         }
-        /* Do nothing */
     }
 
     // Browsing related JNI callbacks.
@@ -732,41 +735,112 @@ public class AvrcpControllerService extends ProfileService {
 
     private native void cleanupNative();
 
-    public native boolean sendPassThroughCommandNative(byte[] address, int keyCode, int keyState);
+    /**
+     * Send button press commands to addressed device
+     *
+     * @param keyCode  key code as defined in AVRCP specification
+     * @param keyState 0 = key pressed, 1 = key released
+     * @return command was sent
+     */
+    public native static boolean sendPassThroughCommandNative(byte[] address, int keyCode, int keyState);
 
-    static native boolean sendGroupNavigationCommandNative(byte[] address, int keyCode,
+    /**
+     * Send group navigation commands
+     *
+     * @param keyCode  next/previous
+     * @param keyState state
+     * @return command was sent
+     */
+    public native static boolean sendGroupNavigationCommandNative(byte[] address, int keyCode,
             int keyState);
 
-    static native void setPlayerApplicationSettingValuesNative(byte[] address, byte numAttrib,
-            byte[] atttibIds, byte[] attribVal);
+    /**
+     * Change player specific settings such as shuffle
+     *
+     * @param numAttrib number of settings being sent
+     * @param attribIds list of settings to be changed
+     * @param attribVal list of settings values
+     */
+    public native static void setPlayerApplicationSettingValuesNative(byte[] address, byte numAttrib,
+            byte[] attribIds, byte[] attribVal);
 
-    /* This api is used to send response to SET_ABS_VOL_CMD */
-    static native void sendAbsVolRspNative(byte[] address, int absVol, int label);
+    /**
+     * Send response to set absolute volume
+     *
+     * @param absVol new volume
+     * @param label  label
+     */
+    public native static void sendAbsVolRspNative(byte[] address, int absVol, int label);
 
-    /* This api is used to inform remote for any volume level changes */
-    static native void sendRegisterAbsVolRspNative(byte[] address, byte rspType, int absVol,
+    /**
+     * Register for any volume level changes
+     *
+     * @param rspType type of response
+     * @param absVol  current volume
+     * @param label   label
+     */
+    public native static void sendRegisterAbsVolRspNative(byte[] address, byte rspType, int absVol,
             int label);
 
-    /* API used to fetch the playback state */
-    static native void getPlaybackStateNative(byte[] address);
+    /**
+     * Fetch the playback state
+     */
+    public native static void getPlaybackStateNative(byte[] address);
 
-    /* API used to fetch the current now playing list */
-    static native void getNowPlayingListNative(byte[] address, int start, int end);
+    /**
+     * Fetch the current now playing list
+     *
+     * @param start first index to retrieve
+     * @param end   last index to retrieve
+     */
+    public native static void getNowPlayingListNative(byte[] address, int start, int end);
 
-    /* API used to fetch the current folder's listing */
-    static native void getFolderListNative(byte[] address, int start, int end);
+    /**
+     * Fetch the current folder's listing
+     *
+     * @param start first index to retrieve
+     * @param end   last index to retrieve
+     */
+    public native static void getFolderListNative(byte[] address, int start, int end);
 
-    /* API used to fetch the listing of players */
-    static native void getPlayerListNative(byte[] address, int start, int end);
+    /**
+     * Fetch the listing of players
+     *
+     * @param start first index to retrieve
+     * @param end   last index to retrieve
+     */
+    public native static void getPlayerListNative(byte[] address, int start, int end);
 
-    /* API used to change the folder */
-    static native void changeFolderPathNative(byte[] address, byte direction, long uid);
+    /**
+     * Change the current browsed folder
+     *
+     * @param direction up/down
+     * @param uid       folder unique id
+     */
+    public native static void changeFolderPathNative(byte[] address, byte direction, long uid);
 
-    static native void playItemNative(byte[] address, byte scope, long uid, int uidCounter);
+    /**
+     * Play item with provided uid
+     *
+     * @param scope      scope of item to played
+     * @param uid        song unique id
+     * @param uidCounter counter
+     */
+    public native static void playItemNative(byte[] address, byte scope, long uid, int uidCounter);
 
-    static native void setBrowsedPlayerNative(byte[] address, int playerId);
+    /**
+     * Set a specific player for browsing
+     *
+     * @param playerId player number
+     */
+    public native static void setBrowsedPlayerNative(byte[] address, int playerId);
 
-    static native void setAddressedPlayerNative(byte[] address, int playerId);
+    /**
+     * Set a specific player for handling playback commands
+     *
+     * @param playerId player number
+     */
+    public native static void setAddressedPlayerNative(byte[] address, int playerId);
 
     /* This api is used to fetch ElementAttributes */
     native static void getElementAttributesNative(byte[] address, byte numAttributes,

@@ -67,7 +67,7 @@ public class BluetoothMapService extends ProfileService {
      * DEBUG log: "setprop log.tag.BluetoothMapService VERBOSE"
      */
 
-    public static final boolean DEBUG = true; //FIXME set to false;
+    public static final boolean DEBUG = false;
 
     public static final boolean VERBOSE = Log.isLoggable(LOG_TAG, Log.VERBOSE);
 
