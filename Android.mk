@@ -1,3 +1,4 @@
+ifneq ($(TARGET_USE_QTI_BT_STACK),true)
 LOCAL_PATH:= $(call my-dir)
 
 # MAP API module
@@ -91,3 +92,4 @@ LOCAL_PREBUILT_STATIC_JAVA_LIBRARIES := \
         bt-jetbrain-nodeps:../../../../../prebuilts/tools/common/m2/repository/org/jetbrains/annotations/13.0/annotations-13.0.jar
 
 include $(BUILD_HOST_PREBUILT)
+endif
