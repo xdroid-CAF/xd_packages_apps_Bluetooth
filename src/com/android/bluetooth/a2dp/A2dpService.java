@@ -1092,6 +1092,10 @@ public class A2dpService extends ProfileService {
             Log.e(TAG, "setCodecConfigPreference: Invalid device");
             return;
         }
+        if (codecConfig == null) {
+            Log.e(TAG, "setCodecConfigPreference: Codec config can't be null");
+            return;
+        }
 
         long cs4 = codecConfig.getCodecSpecific4();
             GattService mGattService = GattService.getGattService();

@@ -70,6 +70,8 @@ public class AvrcpTargetService extends ProfileService {
             MediaPlayerList.FolderUpdateCallback {
         @Override
         public void run(MediaData data) {
+            if (mNativeInterface == null) return;
+
             boolean metadata = !Objects.equals(mCurrentData.metadata, data.metadata);
             boolean state = !MediaPlayerWrapper.playstateEquals(mCurrentData.state, data.state);
             boolean queue = !Objects.equals(mCurrentData.queue, data.queue);
@@ -86,6 +88,8 @@ public class AvrcpTargetService extends ProfileService {
         @Override
         public void run(boolean availablePlayers, boolean addressedPlayers,
                 boolean uids) {
+            if (mNativeInterface == null) return;
+
             mNativeInterface.sendFolderUpdate(availablePlayers, addressedPlayers, uids);
         }
     }
@@ -286,15 +290,13 @@ public class AvrcpTargetService extends ProfileService {
 
     // TODO (apanicke): Add checks to blacklist Absolute Volume devices if they behave poorly.
     void setVolume(int avrcpVolume) {
-        int deviceVolume =
-                (int) Math.floor((double) avrcpVolume * sDeviceMaxVolume / AVRCP_MAX_VOL);
-        if (DEBUG) {
-            Log.d(TAG, "SendVolumeChanged: avrcpVolume=" + avrcpVolume
-                    + " deviceVolume=" + deviceVolume
-                    + " sDeviceMaxVolume=" + sDeviceMaxVolume);
+        BluetoothDevice activeDevice = mFactory.getA2dpService().getActiveDevice();
+        if (activeDevice == null) {
+            Log.d(TAG, "setVolume: no active device");
+            return;
         }
-        mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, deviceVolume,
-                AudioManager.FLAG_SHOW_UI | AudioManager.FLAG_BLUETOOTH_ABS_VOLUME);
+
+        mVolumeManager.setVolume(activeDevice, avrcpVolume);
     }
 
     /**
@@ -302,15 +304,13 @@ public class AvrcpTargetService extends ProfileService {
      * volume.
      */
     public void sendVolumeChanged(int deviceVolume) {
-        int avrcpVolume =
-                (int) Math.floor((double) deviceVolume * AVRCP_MAX_VOL / sDeviceMaxVolume);
-        if (avrcpVolume > 127) avrcpVolume = 127;
-        if (DEBUG) {
-            Log.d(TAG, "SendVolumeChanged: avrcpVolume=" + avrcpVolume
-                    + " deviceVolume=" + deviceVolume
-                    + " sDeviceMaxVolume=" + sDeviceMaxVolume);
+        BluetoothDevice activeDevice = mFactory.getA2dpService().getActiveDevice();
+        if (activeDevice == null) {
+            Log.d(TAG, "sendVolumeChanged: no active device");
+            return;
         }
-        mNativeInterface.sendVolumeChanged(avrcpVolume);
+
+        mVolumeManager.sendVolumeChanged(activeDevice, deviceVolume);
     }
 
     Metadata getCurrentSongInfo() {
