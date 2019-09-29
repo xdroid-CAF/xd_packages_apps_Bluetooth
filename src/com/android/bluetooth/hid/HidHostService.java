@@ -27,6 +27,8 @@ import android.os.Message;
 import android.os.UserHandle;
 import android.util.Log;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.bluetooth.BluetoothMetricsProto;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
@@ -794,7 +796,15 @@ public class HidHostService extends ProfileService {
         }
     }
 
-    private boolean okToConnect(BluetoothDevice device) {
+    /**
+     * Check whether can connect to a peer device.
+     * The check considers a number of factors during the evaluation.
+     *
+     * @param device the peer device to connect to
+     * @return true if connection is allowed, otherwise false
+     */
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    public boolean okToConnect(BluetoothDevice device) {
         AdapterService adapterService = AdapterService.getAdapterService();
         //check if it is inbound connection in Quiet mode, priority and Bond status
         //to decide if its ok to allow this connection
