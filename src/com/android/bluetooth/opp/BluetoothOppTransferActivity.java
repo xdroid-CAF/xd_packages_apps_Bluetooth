@@ -492,7 +492,9 @@ public class BluetoothOppTransferActivity extends AlertActivity
         }
     }
 
- // Retry the failed transfer in background thread
+   /*
+    * Retry the failed transfer in background thread
+    */
    private void retryFailedTrasfer() {
         new Thread() {
             @Override
