@@ -60,6 +60,7 @@ class MediaPlayerWrapper {
 
     public interface Callback {
         void mediaUpdatedCallback(MediaData data);
+        void sessionUpdatedCallback(String packageName);
     }
 
     boolean isPlaybackStateReady() {
@@ -134,8 +135,9 @@ class MediaPlayerWrapper {
     }
 
     long getActiveQueueID() {
-        if (mMediaController.getPlaybackState() == null) return -1;
-        return mMediaController.getPlaybackState().getActiveQueueItemId();
+        PlaybackState state = mMediaController.getPlaybackState();
+        if (state == null) return -1;
+        return state.getActiveQueueItemId();
     }
 
     List<Metadata> getCurrentQueue() {
@@ -470,6 +472,7 @@ class MediaPlayerWrapper {
         @Override
         public void onSessionDestroyed() {
             Log.w(TAG, "The session was destroyed " + mPackageName);
+            mRegisteredCallback.sessionUpdatedCallback(mPackageName);
         }
 
         @VisibleForTesting

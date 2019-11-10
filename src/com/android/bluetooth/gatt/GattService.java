@@ -355,7 +355,7 @@ public class GattService extends ProfileService {
             if (isScanClient(mScannerId)) {
                 ScanClient client = new ScanClient(mScannerId);
                 client.appDied = true;
-                stopScan(client);
+                stopScan(client.scannerId);
             }
         }
 
@@ -512,7 +512,7 @@ public class GattService extends ProfileService {
             if (service == null) {
                 return;
             }
-            service.stopScan(new ScanClient(scannerId));
+            service.stopScan(scannerId);
         }
 
         @Override
@@ -1043,7 +1043,7 @@ public class GattService extends ProfileService {
             } catch (RemoteException | PendingIntent.CanceledException e) {
                 Log.e(TAG, "Exception: " + e);
                 mScannerMap.remove(client.scannerId);
-                mScanManager.stopScan(client);
+                mScanManager.stopScan(client.scannerId);
             }
         }
     }
@@ -1055,7 +1055,7 @@ public class GattService extends ProfileService {
         try {
             sendResultsByPendingIntent(pii, results, callbackType);
         } catch (PendingIntent.CanceledException e) {
-            stopScan(client);
+            stopScan(client.scannerId);
             unregisterScanner(client.scannerId);
         }
     }
@@ -1607,7 +1607,7 @@ public class GattService extends ProfileService {
         } catch (RemoteException | PendingIntent.CanceledException e) {
             Log.e(TAG, "Exception: " + e);
             mScannerMap.remove(client.scannerId);
-            mScanManager.stopScan(client);
+            mScanManager.stopScan(client.scannerId);
         }
     }
 
@@ -2054,7 +2054,7 @@ public class GattService extends ProfileService {
         mScanManager.flushBatchScanResults(new ScanClient(scannerId));
     }
 
-    void stopScan(ScanClient client) {
+    void stopScan(int scannerId) {
         enforceAdminPermission();
         int scanQueueSize =
                 mScanManager.getBatchScanQueue().size() + mScanManager.getRegularScanQueue().size();
@@ -2063,12 +2063,12 @@ public class GattService extends ProfileService {
         }
 
         AppScanStats app = null;
-        app = mScannerMap.getAppScanStatsById(client.scannerId);
+        app = mScannerMap.getAppScanStatsById(scannerId);
         if (app != null) {
-            app.recordScanStop(client.scannerId);
+            app.recordScanStop(scannerId);
         }
         if (mScanManager != null) {
-            mScanManager.stopScan(client);
+            mScanManager.stopScan(scannerId);
         }
     }
 
@@ -2082,7 +2082,7 @@ public class GattService extends ProfileService {
         }
         if (app != null) {
             final int scannerId = app.id;
-            stopScan(new ScanClient(scannerId));
+            stopScan(scannerId);
             // Also unregister the scanner
             unregisterScanner(scannerId);
         }
@@ -2132,7 +2132,7 @@ public class GattService extends ProfileService {
             if (DBG) Log.d(TAG, "unreg:" + appId);
             if (isScanClient(appId)) {
                 ScanClient client = new ScanClient(appId);
-                stopScan(client);
+                stopScan(client.scannerId);
                 unregisterScanner(appId);
             }
         }
