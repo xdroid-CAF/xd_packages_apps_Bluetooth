@@ -352,25 +352,25 @@ public class GattService extends ProfileService {
                 Log.d(TAG, "Binder is dead - unregistering scanner (" + mScannerId + ")!");
             }
 
-            if (isScanClient(mScannerId)) {
-                ScanClient client = new ScanClient(mScannerId);
+            ScanClient client = getScanClient(mScannerId);
+            if (client != null) {
                 client.appDied = true;
                 stopScan(client.scannerId);
             }
         }
 
-        private boolean isScanClient(int clientIf) {
+        private ScanClient getScanClient(int clientIf) {
             for (ScanClient client : mScanManager.getRegularScanQueue()) {
                 if (client.scannerId == clientIf) {
-                    return true;
+                    return client;
                 }
             }
             for (ScanClient client : mScanManager.getBatchScanQueue()) {
                 if (client.scannerId == clientIf) {
-                    return true;
+                    return client;
                 }
             }
-            return false;
+            return null;
         }
     }
 
@@ -2004,6 +2004,13 @@ public class GattService extends ProfileService {
         piInfo.settings = settings;
         piInfo.filters = filters;
         piInfo.callingPackage = callingPackage;
+
+        // Don't start scan if the Pi scan already in mScannerMap.
+        if (mScannerMap.getByContextInfo(piInfo) != null) {
+            Log.d(TAG, "Don't startScan(PI) since the same Pi scan already in mScannerMap.");
+            return;
+        }
+
         ScannerMap.App app = mScannerMap.add(uuid, null, null, piInfo, this);
         app.mUserHandle = UserHandle.of(UserHandle.getCallingUserId());
         mAppOps.checkPackage(Binder.getCallingUid(), callingPackage);
