@@ -678,22 +678,9 @@ public class A2dpService extends ProfileService {
         }
     }
 
-    private void storeActiveDeviceVolume() {
-        // Make sure volume has been stored before been removed from active.
-        if (mFactory.getAvrcpTargetService() != null && mActiveDevice != null) {
-            mFactory.getAvrcpTargetService().storeVolumeForDevice(mActiveDevice);
-        }
-        if (mActiveDevice != null && mAvrcp_ext != null) {
-            mAvrcp_ext.storeVolumeForDevice(mActiveDevice);
-        }
-    }
-
     private void removeActiveDevice(boolean forceStopPlayingAudio) {
         BluetoothDevice previousActiveDevice = mActiveDevice;
         synchronized (mBtA2dpLock) {
-            // Make sure volume has been store before device been remove from active.
-            storeActiveDeviceVolume();
-
             // This needs to happen before we inform the audio manager that the device
             // disconnected. Please see comment in updateAndBroadcastActiveDevice() for why.
             updateAndBroadcastActiveDevice(null);
@@ -760,22 +747,6 @@ public class A2dpService extends ProfileService {
             }
         }
         return true;
-    }
-
-    /**
-     * Early notification that Hearing Aids will be the active device. This allows the A2DP to save
-     * its volume before the Audio Service starts changing its media stream.
-     */
-    public void earlyNotifyHearingAidActive() {
-        enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH ADMIN permission");
-
-        synchronized (mStateMachines) {
-            // Switch active device from A2DP to Hearing Aids.
-            if (DBG) {
-                Log.d(TAG, "earlyNotifyHearingAidActive: Save volume for " + mActiveDevice);
-            }
-            storeActiveDeviceVolume();
-        }
     }
 
     /**
@@ -848,14 +819,6 @@ public class A2dpService extends ProfileService {
                 }
             }
             codecStatus = sm.getCodecStatus();
-
-            if (deviceChanged) {
-                // Switch from one A2DP to another A2DP device
-                if (DBG) {
-                    Log.d(TAG, "Switch A2DP devices to " + device + " from " + mActiveDevice);
-                }
-                storeActiveDeviceVolume();
-            }
 
             // This needs to happen before we inform the audio manager that the device
             // disconnected. Please see comment in updateAndBroadcastActiveDevice() for why.
