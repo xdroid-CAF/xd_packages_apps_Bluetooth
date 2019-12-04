@@ -236,7 +236,6 @@ class AvrcpControllerStateMachine extends StateMachine {
         mService.sBrowseTree.mRootNode.addChild(mBrowseTree.mRootNode);
         BluetoothMediaBrowserService.notifyChanged(mService
                 .sBrowseTree.mRootNode);
-        BluetoothMediaBrowserService.notifyChanged(mAddressedPlayer.getPlaybackState());
         mBrowsingConnected = true;
     }
 
@@ -248,13 +247,11 @@ class AvrcpControllerStateMachine extends StateMachine {
             mBrowseTree.mNowPlayingNode.setCached(false);
             BluetoothMediaBrowserService.notifyChanged(mBrowseTree.mNowPlayingNode);
         }
-        BluetoothMediaBrowserService.addressedPlayerChanged(null);
         if (mBrowseTree != null && mBrowseTree.mRootNode != null) {
             mService.sBrowseTree.mRootNode.removeChild(
                      mBrowseTree.mRootNode);
             BluetoothMediaBrowserService.notifyChanged(mService.sBrowseTree.mRootNode);
         }
-        BluetoothMediaBrowserService.trackChanged(null);
         mBrowsingConnected = false;
     }
 
@@ -320,6 +317,7 @@ class AvrcpControllerStateMachine extends StateMachine {
                 BluetoothDevice device =
                         BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mDeviceAddress);
                 mA2dpDevice = device;
+                BluetoothMediaBrowserService.notifyChanged(mAddressedPlayer.getPlaybackState());
                 broadcastConnectionStateChanged(BluetoothProfile.STATE_CONNECTED);
                 BluetoothMediaBrowserService.addressedPlayerChanged(mSessionCallbacks);
             } else {
@@ -805,6 +803,8 @@ class AvrcpControllerStateMachine extends StateMachine {
         @Override
         public void enter() {
             onBrowsingDisconnected();
+            BluetoothMediaBrowserService.trackChanged(null);
+            BluetoothMediaBrowserService.addressedPlayerChanged(null);
             broadcastConnectionStateChanged(BluetoothProfile.STATE_DISCONNECTING);
             transitionTo(mDisconnected);
         }
