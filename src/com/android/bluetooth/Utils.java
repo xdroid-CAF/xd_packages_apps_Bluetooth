@@ -16,7 +16,6 @@
 
 package com.android.bluetooth;
 
-import android.app.ActivityManager;
 import android.app.AppOpsManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -41,7 +40,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.util.List;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -69,6 +70,10 @@ public final class Utils {
     public static byte[] getByteAddress(BluetoothDevice device) {
         if (device == null) return new byte[BD_ADDR_LEN];
         return getBytesFromAddress(device.getAddress());
+    }
+
+    public static byte[] addressToBytes(String address) {
+        return getBytesFromAddress(address);
     }
 
     public static byte[] getBytesFromAddress(String address) {
@@ -254,6 +259,52 @@ public final class Utils {
         Utils.sForegroundUserId = uid;
     }
 
+    public static void enforceBluetoothPermission(Context context) {
+        context.enforceCallingOrSelfPermission(
+                android.Manifest.permission.BLUETOOTH,
+                "Need BLUETOOTH permission");
+    }
+
+    public static void enforceBluetoothAdminPermission(Context context) {
+        context.enforceCallingOrSelfPermission(
+                android.Manifest.permission.BLUETOOTH_ADMIN,
+                "Need BLUETOOTH ADMIN permission");
+    }
+
+    public static void enforceBluetoothPrivilegedPermission(Context context) {
+        context.enforceCallingOrSelfPermission(
+                android.Manifest.permission.BLUETOOTH_PRIVILEGED,
+                "Need BLUETOOTH PRIVILEGED permission");
+    }
+
+    public static void enforceLocalMacAddressPermission(Context context) {
+        context.enforceCallingOrSelfPermission(
+                android.Manifest.permission.LOCAL_MAC_ADDRESS,
+                "Need LOCAL_MAC_ADDRESS permission");
+    }
+
+    public static void enforceDumpPermission(Context context) {
+        context.enforceCallingOrSelfPermission(
+                android.Manifest.permission.DUMP,
+                "Need DUMP permission");
+    }
+
+    public static boolean callerIsSystemOrActiveUser(String tag, String method) {
+        if (!checkCaller()) {
+          Log.w(TAG, method + "() - Not allowed for non-active user and non-system user");
+          return false;
+        }
+        return true;
+    }
+
+    public static boolean callerIsSystemOrActiveOrManagedUser(Context context, String tag, String method) {
+        if (!checkCallerAllowManagedProfiles(context)) {
+          Log.w(TAG, method + "() - Not allowed for non-active user and non-system and non-managed user");
+          return false;
+        }
+        return true;
+    }
+
     public static boolean checkCaller() {
         int callingUser = UserHandle.getCallingUserId();
         int callingUid = Binder.getCallingUid();
@@ -321,7 +372,7 @@ public final class Utils {
         if (context.checkCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_COARSE_LOCATION)
                         == PackageManager.PERMISSION_GRANTED
-                && isAppOppAllowed(appOps, AppOpsManager.OP_FINE_LOCATION, callingPackage)) {
+                && isAppOppAllowed(appOps, AppOpsManager.OPSTR_FINE_LOCATION, callingPackage)) {
             return true;
         }
 
@@ -345,7 +396,7 @@ public final class Utils {
         if (context.checkCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_FINE_LOCATION)
                         == PackageManager.PERMISSION_GRANTED
-                && isAppOppAllowed(appOps, AppOpsManager.OP_FINE_LOCATION, callingPackage)) {
+                && isAppOppAllowed(appOps, AppOpsManager.OPSTR_FINE_LOCATION, callingPackage)) {
             return true;
         }
 
@@ -353,7 +404,7 @@ public final class Utils {
         if (context.checkCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_COARSE_LOCATION)
                         == PackageManager.PERMISSION_GRANTED
-                && isAppOppAllowed(appOps, AppOpsManager.OP_FINE_LOCATION, callingPackage)) {
+                && isAppOppAllowed(appOps, AppOpsManager.OPSTR_FINE_LOCATION, callingPackage)) {
             return true;
         }
 
@@ -376,7 +427,7 @@ public final class Utils {
         if (context.checkCallingOrSelfPermission(
                 android.Manifest.permission.ACCESS_FINE_LOCATION)
                         == PackageManager.PERMISSION_GRANTED
-                && isAppOppAllowed(appOps, AppOpsManager.OP_FINE_LOCATION, callingPackage)) {
+                && isAppOppAllowed(appOps, AppOpsManager.OPSTR_FINE_LOCATION, callingPackage)) {
             return true;
         }
 
@@ -412,7 +463,7 @@ public final class Utils {
         return true;
     }
 
-    private static boolean isAppOppAllowed(AppOpsManager appOps, int op, String callingPackage) {
+    private static boolean isAppOppAllowed(AppOpsManager appOps, String op, String callingPackage) {
         return appOps.noteOp(op, Binder.getCallingUid(), callingPackage)
                 == AppOpsManager.MODE_ALLOWED;
     }
@@ -468,5 +519,15 @@ public final class Utils {
      */
     public static String getUidPidString() {
         return "uid/pid=" + Binder.getCallingUid() + "/" + Binder.getCallingPid();
+    }
+
+    /**
+     * Get system local time
+     *
+     * @return "MM-dd HH:mm:ss.SSS"
+     */
+    public static String getLocalTimeString() {
+        return DateTimeFormatter.ofPattern("MM-dd HH:mm:ss.SSS")
+                .withZone(ZoneId.systemDefault()).format(Instant.now());
     }
 }

@@ -1,3 +1,93 @@
-subdirs = [
-    "jni",
-]
+// Bluetooth is in it's own namespace to allow it to be replaced with an
+// alternate implementation.
+soong_namespace {
+}
+
+// MAP API module
+
+java_library {
+    name: "bluetooth.mapsapi",
+
+    srcs: ["lib/mapapi/**/*.java"],
+}
+
+// Bluetooth JNI
+
+cc_library_shared {
+    name: "libbluetooth_jni",
+    srcs: ["jni/**/*.cpp"],
+    header_libs: ["libbluetooth_headers"],
+    include_dirs: [
+        "system/bt/types",
+        "vendor/qcom/opensource/commonsys/bluetooth_ext/vhal/include",
+    ],
+    shared_libs: [
+        "libandroid_runtime",
+        "libbase",
+        "libchrome",
+        "libnativehelper",
+        "liblog",
+    ],
+    static_libs: [
+        "libbluetooth-types",
+        "libcutils",
+        "libbluetoothqti_jni",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-Wno-unused-parameter",
+    ],
+    sanitize: {
+        scs: true,
+    },
+}
+
+// Bluetooth APK
+
+android_app {
+    name: "Bluetooth",
+
+    srcs: [
+        "src/**/*.java",
+        ":vendor_qcom_opensource_commonsys_bluetooth_ext_packages_apps_bluetooth_ext",
+    ],
+    platform_apis: true,
+    certificate: "platform",
+
+    jni_libs: ["libbluetooth_jni"],
+    libs: [
+        "javax.obex",
+        "telephony-common",
+        "services.net",
+    ],
+    static_libs: [
+        "com.android.vcard",
+        "bluetooth.mapsapi",
+        "sap-api-java-static",
+        "services.net",
+        "libprotobuf-java-lite",
+        "bluetooth-protos-lite",
+        "androidx.core_core",
+        "androidx.legacy_legacy-support-v4",
+        "androidx.lifecycle_lifecycle-livedata",
+        "androidx.room_room-runtime",
+        "guava",
+    ],
+
+    plugins: [
+        "androidx.room_room-compiler-plugin",
+    ],
+
+    javacflags: ["-Aroom.schemaLocation=tests/unit/src/com/android/bluetooth/btservice/storage/schemas"],
+
+    optimize: {
+        enabled: false,
+    },
+    required: ["libbluetooth"],
+
+    proto: {
+        type: "micro",
+    },
+}

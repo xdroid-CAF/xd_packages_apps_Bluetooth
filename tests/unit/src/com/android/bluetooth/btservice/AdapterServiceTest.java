@@ -71,6 +71,7 @@ public class AdapterServiceTest {
     private static final String TAG = AdapterServiceTest.class.getSimpleName();
 
     private AdapterService mAdapterService;
+    private AdapterService.AdapterServiceBinder mServiceBinder;
 
     private @Mock Context mMockContext;
     private @Mock ApplicationInfo mMockApplicationInfo;
@@ -119,6 +120,7 @@ public class AdapterServiceTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 () -> mAdapterService = new AdapterService());
+        mServiceBinder = new AdapterService.AdapterServiceBinder(mAdapterService);
         mMockPackageManager = mock(PackageManager.class);
         mMockContentResolver = new MockContentResolver(mMockContext);
         MockitoAnnotations.initMocks(this);
@@ -182,11 +184,11 @@ public class AdapterServiceTest {
     }
 
     private void doEnable(int invocationNumber, boolean onlyGatt) {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         final int startServiceCalls = 2 * (onlyGatt ? 1 : 3); // Start and stop GATT + 2
 
-        mAdapterService.enable();
+        mAdapterService.enable(false);
 
         verifyStateChange(BluetoothAdapter.STATE_OFF, BluetoothAdapter.STATE_BLE_TURNING_ON,
                 invocationNumber + 1, CONTEXT_SWITCH_MS);
@@ -220,14 +222,14 @@ public class AdapterServiceTest {
 
         verify(mMockContext, timeout(CONTEXT_SWITCH_MS).times(2 * invocationNumber + 2))
                 .sendBroadcast(any(), eq(android.Manifest.permission.BLUETOOTH));
-        final int scanMode = mAdapterService.getScanMode();
+        final int scanMode = mServiceBinder.getScanMode();
         Assert.assertTrue(scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE
                 || scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE);
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
     }
 
     private void doDisable(int invocationNumber, boolean onlyGatt) {
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         final int startServiceCalls = 2 * (onlyGatt ? 1 : 3); // Start and stop GATT + 2
 
@@ -260,7 +262,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF, BluetoothAdapter.STATE_OFF,
                 invocationNumber + 1, NATIVE_DISABLE_MS);
 
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
     }
 
     /**
@@ -314,9 +316,9 @@ public class AdapterServiceTest {
      */
     @Test
     public void testGattStartTimeout() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
-        mAdapterService.enable();
+        mAdapterService.enable(false);
 
         verifyStateChange(BluetoothAdapter.STATE_OFF, BluetoothAdapter.STATE_BLE_TURNING_ON, 1,
                 CONTEXT_SWITCH_MS);
@@ -336,7 +338,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF, BluetoothAdapter.STATE_OFF, 1,
                 NATIVE_DISABLE_MS);
 
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
     }
 
     /**
@@ -346,7 +348,7 @@ public class AdapterServiceTest {
     @Test
     public void testGattStopTimeout() {
         doEnable(0, false);
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         mAdapterService.disable();
 
@@ -372,7 +374,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF, BluetoothAdapter.STATE_OFF, 1,
                 AdapterState.BLE_STOP_TIMEOUT_DELAY + NATIVE_DISABLE_MS);
 
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
     }
 
     /**
@@ -381,9 +383,9 @@ public class AdapterServiceTest {
      */
     @Test
     public void testProfileStartTimeout() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
-        mAdapterService.enable();
+        mAdapterService.enable(false);
 
         verifyStateChange(BluetoothAdapter.STATE_OFF, BluetoothAdapter.STATE_BLE_TURNING_ON, 1,
                 CONTEXT_SWITCH_MS);
@@ -426,7 +428,7 @@ public class AdapterServiceTest {
     public void testProfileStopTimeout() {
         doEnable(0, false);
 
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         mAdapterService.disable();
 
@@ -448,7 +450,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF, BluetoothAdapter.STATE_OFF, 1,
                 AdapterState.BLE_STOP_TIMEOUT_DELAY + NATIVE_DISABLE_MS);
 
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
     }
 
     /**
@@ -462,7 +464,7 @@ public class AdapterServiceTest {
         SystemProperties.set(AdapterService.BLUETOOTH_BTSNOOP_LOG_MODE_PROPERTY, "false");
         doEnable(0, false);
 
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         Assert.assertFalse(
                 SystemProperties.get(AdapterService.BLUETOOTH_BTSNOOP_LOG_MODE_PROPERTY,
@@ -495,7 +497,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF, BluetoothAdapter.STATE_OFF, 1,
                 NATIVE_DISABLE_MS);
 
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
 
         // Restore earlier setting
         SystemProperties.set(AdapterService.BLUETOOTH_BTSNOOP_LOG_MODE_PROPERTY, snoopSetting);
@@ -518,7 +520,7 @@ public class AdapterServiceTest {
      */
     @Test
     public void testObfuscateBluetoothAddress_BluetoothDisabled() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] metricsSalt = getMetricsSalt(mAdapterConfig);
         Assert.assertNotNull(metricsSalt);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
@@ -534,9 +536,9 @@ public class AdapterServiceTest {
      */
     @Test
     public void testObfuscateBluetoothAddress_BluetoothEnabled() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         doEnable(0, false);
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] metricsSalt = getMetricsSalt(mAdapterConfig);
         Assert.assertNotNull(metricsSalt);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
@@ -551,7 +553,7 @@ public class AdapterServiceTest {
      */
     @Test
     public void testObfuscateBluetoothAddress_PersistentBetweenToggle() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] metricsSalt = getMetricsSalt(mAdapterConfig);
         Assert.assertNotNull(metricsSalt);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
@@ -562,7 +564,7 @@ public class AdapterServiceTest {
                 obfuscatedAddress1);
         // Enable
         doEnable(0, false);
-        Assert.assertTrue(mAdapterService.isEnabled());
+        Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] obfuscatedAddress3 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress3.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress3));
@@ -570,7 +572,7 @@ public class AdapterServiceTest {
                 obfuscatedAddress1);
         // Disable
         doDisable(0, false);
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] obfuscatedAddress4 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress4.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress4));
@@ -587,7 +589,7 @@ public class AdapterServiceTest {
             PackageManager.NameNotFoundException {
         byte[] metricsSalt = getMetricsSalt(mAdapterConfig);
         Assert.assertNotNull(metricsSalt);
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
         byte[] obfuscatedAddress1 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress1.length > 0);
@@ -596,7 +598,7 @@ public class AdapterServiceTest {
                 obfuscatedAddress1);
         tearDown();
         setUp();
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         byte[] obfuscatedAddress2 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress2.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress2));
@@ -623,7 +625,7 @@ public class AdapterServiceTest {
             + " after factory reset")
     @Test
     public void testObfuscateBluetoothAddress_FactoryReset() {
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
         byte[] obfuscatedAddress1 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress1.length > 0);
@@ -657,7 +659,7 @@ public class AdapterServiceTest {
             PackageManager.NameNotFoundException {
         byte[] metricsSalt1 = getMetricsSalt(mAdapterConfig);
         Assert.assertNotNull(metricsSalt1);
-        Assert.assertFalse(mAdapterService.isEnabled());
+        Assert.assertFalse(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
         BluetoothDevice device = TestUtils.getTestDevice(BluetoothAdapter.getDefaultAdapter(), 0);
         byte[] obfuscatedAddress1 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress1.length > 0);
