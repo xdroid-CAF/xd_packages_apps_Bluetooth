@@ -121,6 +121,7 @@ class AvrcpControllerStateMachine extends StateMachine {
     boolean mRemoteControlConnected = false;
     boolean mBrowsingConnected = false;
     final BrowseTree mBrowseTree;
+    private boolean smActive = false;
     private AvrcpPlayer mAddressedPlayer = new AvrcpPlayer();
     private RemoteDevice mRemoteDevice;
     private int mPreviousPercentageVol = -1;
@@ -155,6 +156,7 @@ class AvrcpControllerStateMachine extends StateMachine {
         addState(mConnected);
         addState(mDisconnecting);
 
+        smActive = true;
         mGetFolderList = new GetFolderList();
         addState(mGetFolderList, mConnected);
 
@@ -232,7 +234,7 @@ class AvrcpControllerStateMachine extends StateMachine {
     }
 
     synchronized void onBrowsingConnected() {
-        if (mBrowsingConnected) return;
+        if (mBrowsingConnected || (!smActive)) return;
         mService.sBrowseTree.mRootNode.addChild(mBrowseTree.mRootNode);
         BluetoothMediaBrowserService.notifyChanged(mService
                 .sBrowseTree.mRootNode);
@@ -240,7 +242,7 @@ class AvrcpControllerStateMachine extends StateMachine {
     }
 
     synchronized void onBrowsingDisconnected() {
-        if (!mBrowsingConnected) return;
+        if (!mBrowsingConnected || (!smActive)) return;
         mAddressedPlayer.setPlayStatus(PlaybackStateCompat.STATE_ERROR);
         mAddressedPlayer.updateCurrentTrack(null);
         if (mBrowseTree != null && mBrowseTree.mNowPlayingNode != null) {
@@ -831,6 +833,9 @@ class AvrcpControllerStateMachine extends StateMachine {
         } catch (IllegalArgumentException expected) {
             // If the receiver was never registered unregister will throw an
             // IllegalArgumentException.
+        }
+        synchronized(AvrcpControllerStateMachine.this) {
+            smActive = false;
         }
         // we should disacrd, all currently queuedup messages.
         quitNow();
