@@ -33,10 +33,10 @@ import android.util.Log;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.TelephonyIntents;
-import com.android.internal.telephony.PhoneConstants;
 
 import java.util.HashMap;
 import java.util.Objects;
+
 
 /**
  * Class that manages Telephony states
@@ -72,18 +72,6 @@ public class HeadsetPhoneState {
     private int mCindRoam = HeadsetHalConstants.SERVICE_TYPE_HOME;
     // HFP 1.6 CIND battchg value
     private int mCindBatteryCharge;
-    // Current Call Number
-    private String mCindNumber;
-    //Current Phone Number Type
-    private int mType = 0;
-    // if its a CS call
-    private boolean mIsCsCall = true;
-    // SIM is absent
-    private int SIM_ABSENT = 0;
-    // SIM is present
-    private int SIM_PRESENT = 1;
-    // Array to keep the SIM status
-    private int[] mSimStatus;
 
     private final HashMap<BluetoothDevice, Integer> mDeviceEventMap = new HashMap<>();
     private PhoneStateListener mPhoneStateListener;
@@ -97,33 +85,12 @@ public class HeadsetPhoneState {
         Objects.requireNonNull(mTelephonyManager, "TELEPHONY_SERVICE is null");
         // Register for SubscriptionInfo list changes which is guaranteed to invoke
         // onSubscriptionInfoChanged and which in turns calls loadInBackgroud.
-        mSubscriptionManager = (SubscriptionManager)  mHeadsetService.
-                 getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+        mSubscriptionManager = SubscriptionManager.from(mHeadsetService);
         Objects.requireNonNull(mSubscriptionManager, "TELEPHONY_SUBSCRIPTION_SERVICE is null");
         // Initialize subscription on the handler thread
         mOnSubscriptionsChangedListener = new HeadsetPhoneStateOnSubscriptionChangedListener(
                 headsetService.getStateMachinesThreadLooper());
         mSubscriptionManager.addOnSubscriptionsChangedListener(mOnSubscriptionsChangedListener);
-        IntentFilter simStateChangedFilter =
-                        new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
-        mSimStatus = new int [mTelephonyManager.getPhoneCount()];
-        //Record the SIM states upon BT reset
-        try {
-            for (int i = 0; i < mSimStatus.length; i++) {
-                if (mTelephonyManager.getSimState(i) ==
-                        TelephonyManager.SIM_STATE_READY) {
-                    Log.d(TAG, "The sim in i: " + i + " is present");
-                    mSimStatus[i] = SIM_PRESENT;
-                } else {
-                    Log.d(TAG, "The sim in i: " + i + " is absent");
-                    mSimStatus[i] = SIM_ABSENT;
-                }
-            }
-            mHeadsetService.registerReceiver(mPhoneStateChangeReceiver, simStateChangedFilter);
-        } catch (Exception e) {
-            Log.w(TAG, "Unable to register phone state change receiver and unable to get" +
-                       " sim states", e);
-        }
     }
 
     /**
@@ -135,11 +102,6 @@ public class HeadsetPhoneState {
             stopListenForPhoneState();
         }
         mSubscriptionManager.removeOnSubscriptionsChangedListener(mOnSubscriptionsChangedListener);
-        try {
-             mHeadsetService.unregisterReceiver(mPhoneStateChangeReceiver);
-        } catch (Exception e) {
-            Log.w(TAG, "Unable to unregister phone state change receiver", e);
-        }
     }
 
     @Override
@@ -198,22 +160,13 @@ public class HeadsetPhoneState {
             return;
         }
         Log.i(TAG, "startListenForPhoneState(), subId=" + subId + ", enabled_events=" + events);
-        if (mTelephonyManager == null) {
-            Log.e(TAG, "mTelephonyManager is null, "
-                 + "cannot start listening for phone state changes");
-        } else {
-            mPhoneStateListener = new HeadsetPhoneStateListener(
-                    mHeadsetService.getStateMachinesThreadLooper());
-            try {
-                mTelephonyManager.listen(mPhoneStateListener, events);
-                if ((events & PhoneStateListener.LISTEN_SIGNAL_STRENGTHS) != 0) {
-                    mTelephonyManager.setRadioIndicationUpdateMode(
-                            TelephonyManager.INDICATION_FILTER_SIGNAL_STRENGTH,
-                            TelephonyManager.INDICATION_UPDATE_MODE_IGNORE_SCREEN_OFF);
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Exception while registering for signal strength notifications", e);
-            }
+        mPhoneStateListener = new HeadsetPhoneStateListener(
+                mHeadsetService.getStateMachinesThreadLooper());
+        mTelephonyManager.listen(mPhoneStateListener, events);
+        if ((events & PhoneStateListener.LISTEN_SIGNAL_STRENGTHS) != 0) {
+            mTelephonyManager.setRadioIndicationUpdateMode(
+                    TelephonyManager.INDICATION_FILTER_SIGNAL_STRENGTH,
+                    TelephonyManager.INDICATION_UPDATE_MODE_IGNORE_SCREEN_OFF);
         }
     }
 
@@ -224,77 +177,12 @@ public class HeadsetPhoneState {
         }
         Log.i(TAG, "stopListenForPhoneState(), stopping listener, enabled_events="
                 + getTelephonyEventsToListen());
-        if (mTelephonyManager == null) {
-            Log.e(TAG, "mTelephonyManager is null, "
-                + "cannot send request to stop listening or update radio to normal state");
-        } else {
-            try {
-                mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
-                mTelephonyManager.setRadioIndicationUpdateMode(
-                        TelephonyManager.INDICATION_FILTER_SIGNAL_STRENGTH,
-                        TelephonyManager.INDICATION_UPDATE_MODE_NORMAL);
-            } catch (Exception e) {
-                Log.w(TAG, "exception while registering for signal strength notifications", e);
-            }
-        }
+        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+        mTelephonyManager.setRadioIndicationUpdateMode(
+                TelephonyManager.INDICATION_FILTER_SIGNAL_STRENGTH,
+                TelephonyManager.INDICATION_UPDATE_MODE_NORMAL);
         mPhoneStateListener = null;
     }
-
-    public boolean isValidPhoneId(int phoneId) {
-        return phoneId >= 0 && phoneId < mTelephonyManager.getPhoneCount();
-    }
-
-    private final BroadcastReceiver mPhoneStateChangeReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "onReceive: " + intent.getAction());
-            final String stateExtra = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
-            if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
-                // This is a sticky broadcast, so if it's already been loaded,
-                // this'll execute immediately.
-
-                // TODO (b/122116049) during platform update, a case emerged for an incoming
-                // slotId value of -1; it would likely be beneficial to code defensively
-                // because of this case's possibility from the caller, but the current root
-                // cause is as of yet unidentified
-                if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(stateExtra)) {
-                    final int phoneId = intent.getIntExtra(PhoneConstants.PHONE_KEY,
-                                       SubscriptionManager.getDefaultVoicePhoneId());
-                    if (isValidPhoneId(phoneId) != true) {
-                        Log.d(TAG, "Received invalid phoneId " + phoneId +" for SIM loaded, no action");
-                        return;
-                    }
-                    Log.d(TAG, "SIM loaded, making mIsSimStateLoaded to true for phoneId = "
-                               + phoneId);
-                    mSimStatus[phoneId] = SIM_PRESENT;
-                    mIsSimStateLoaded = true;
-                    sendDeviceStateChanged();
-                } else if (IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)
-                           || IccCardConstants.INTENT_VALUE_ICC_UNKNOWN.equals(stateExtra)
-                           || IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
-                    final int phoneId = intent.getIntExtra(PhoneConstants.PHONE_KEY,
-                                       SubscriptionManager.getDefaultVoicePhoneId());
-                    if (isValidPhoneId(phoneId) != true) {
-                        Log.d(TAG, "Received invalid phoneId " + phoneId +" for SIM unloaded, no action");
-                        return;
-                    }
-                    Log.d(TAG, "SIM unloaded, making mIsSimStateLoaded to false for phoneId = "
-                               + phoneId);
-                    mSimStatus[phoneId] = SIM_ABSENT;
-                    mIsSimStateLoaded = false;
-                    for (int i = 0; i < mSimStatus.length; i++) {
-                        if (mSimStatus[i] == SIM_PRESENT) {
-                            Log.d(TAG, "SIM is loaded in either of the slots, making" +
-                                  " mIsSimStateLoaded to true");
-                              mIsSimStateLoaded = true;
-                              break;
-                         }
-                    }
-                    sendDeviceStateChanged();
-                }
-            }
-        }
-    };
 
     int getCindService() {
         return mCindService;
@@ -307,16 +195,6 @@ public class HeadsetPhoneState {
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void setNumActiveCall(int numActive) {
         mNumActive = numActive;
-    }
-
-    boolean getIsCsCall() {
-        Log.d(TAG, "In getIsCsCall, mIsCsCall: " + mIsCsCall);
-        return mIsCsCall;
-    }
-
-    void setIsCsCall(boolean isCsCall) {
-        Log.d(TAG, "In setIsCsCall, mIsCsCall: " + isCsCall);
-        mIsCsCall = isCsCall;
     }
 
     int getCallState() {
@@ -339,22 +217,6 @@ public class HeadsetPhoneState {
 
     int getCindSignal() {
         return mCindSignal;
-    }
-
-    void setNumber(String mNumberCall ) {
-        mCindNumber = mNumberCall;
-    }
-
-    String getNumber() {
-        return mCindNumber;
-    }
-
-    void setType(int mTypeCall) {
-        mType = mTypeCall;
-    }
-
-    int getType() {
-        return mType;
     }
 
     int getCindRoam() {
@@ -389,7 +251,7 @@ public class HeadsetPhoneState {
         // use the service indicator, but only the signal indicator
         int signal = service == HeadsetHalConstants.NETWORK_STATE_AVAILABLE ? mCindSignal : 0;
 
-        Log.d(TAG, "sendDeviceStateChanged. mService=" + service + " mIsSimStateLoaded="
+        Log.d(TAG, "sendDeviceStateChanged. mService=" + mCindService + " mIsSimStateLoaded="
                 + mIsSimStateLoaded + " mSignal=" + signal + " mRoam=" + mCindRoam
                 + " mBatteryCharge=" + mCindBatteryCharge);
         mHeadsetService.onDeviceStateChanged(
@@ -418,9 +280,7 @@ public class HeadsetPhoneState {
 
         @Override
         public synchronized void onServiceStateChanged(ServiceState serviceState) {
-            Log.d(TAG, "Enter onServiceStateChanged");
             mServiceState = serviceState;
-            int prevService = mCindService;
             int cindService = (serviceState.getState() == ServiceState.STATE_IN_SERVICE)
                     ? HeadsetHalConstants.NETWORK_STATE_AVAILABLE
                     : HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE;
@@ -437,28 +297,34 @@ public class HeadsetPhoneState {
             // If this is due to a SIM insertion, we want to defer sending device state changed
             // until all the SIM config is loaded.
             if (cindService == HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE) {
+                mIsSimStateLoaded = false;
                 sendDeviceStateChanged();
+                return;
             }
+            IntentFilter simStateChangedFilter =
+                    new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+            mHeadsetService.registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                        // This is a sticky broadcast, so if it's already been loaded,
+                        // this'll execute immediately.
+                        if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(
+                                intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE))) {
+                            mIsSimStateLoaded = true;
+                            sendDeviceStateChanged();
+                            mHeadsetService.unregisterReceiver(this);
+                        }
+                    }
+                }
+            }, simStateChangedFilter);
 
-            //Update the signal strength when the service state changes
-            if (prevService == HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE &&
-                cindService == HeadsetHalConstants.NETWORK_STATE_AVAILABLE &&
-                mCindSignal == 0) {
-                Log.d(TAG, "Service is available and signal strength was zero, updating the "+
-                           "current signal strength");
-                mCindSignal = mTelephonyManager.getSignalStrength().getLevel() + 1;
-                // +CIND "signal" indicator is always between 0 to 5
-                mCindSignal = Integer.max(Integer.min(mCindSignal, 5), 0);
-                sendDeviceStateChanged();
-            }
-            Log.d(TAG, "Exit onServiceStateChanged");
         }
 
         @Override
         public void onSignalStrengthsChanged(SignalStrength signalStrength) {
             int prevSignal = mCindSignal;
             if (mCindService == HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE) {
-                Log.d(TAG, "Service is not available, signal strength is set to zero");
                 mCindSignal = 0;
             } else {
                 mCindSignal = signalStrength.getLevel() + 1;
@@ -467,7 +333,6 @@ public class HeadsetPhoneState {
             mCindSignal = Integer.max(Integer.min(mCindSignal, 5), 0);
             // This results in a lot of duplicate messages, hence this check
             if (prevSignal != mCindSignal) {
-                Log.d(TAG, "Updating the signal strength change to the apps");
                 sendDeviceStateChanged();
             }
         }

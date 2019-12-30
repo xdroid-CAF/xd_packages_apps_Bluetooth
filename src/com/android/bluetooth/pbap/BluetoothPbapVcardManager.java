@@ -83,7 +83,6 @@ public class BluetoothPbapVcardManager {
     static final String[] PHONES_CONTACTS_PROJECTION = new String[]{
             Phone.CONTACT_ID, // 0
             Phone.DISPLAY_NAME, // 1
-            Phone.ACCOUNT_TYPE_AND_DATA_SET, //2
     };
 
     static final String[] PHONE_LOOKUP_PROJECTION = new String[]{
@@ -103,7 +102,6 @@ public class BluetoothPbapVcardManager {
     static final String CALLLOG_SORT_ORDER = Calls._ID + " DESC";
 
     private static final int NEED_SEND_BODY = -1;
-    protected static boolean isPullVcardEntry = false;
 
     public BluetoothPbapVcardManager(final Context context) {
         mContext = context;
@@ -157,9 +155,6 @@ public class BluetoothPbapVcardManager {
             case BluetoothPbapObexServer.ContentType.PHONEBOOK:
                 size = getContactsSize();
                 break;
-            case BluetoothPbapObexServer.ContentType.SIM_PHONEBOOK:
-                size = BluetoothPbapObexServer.mVcardSimManager.getSIMContactsSize();
-                break;
             default:
                 size = getCallHistorySize(type);
                 break;
@@ -173,26 +168,18 @@ public class BluetoothPbapVcardManager {
     public final int getContactsSize() {
         final Uri myUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
         Cursor contactCursor = null;
-        MatrixCursor mCursor = null;
         try {
-            contactCursor = mResolver.query(
-                    myUri,
-                    new String[] {Phone.CONTACT_ID, Phone.ACCOUNT_TYPE_AND_DATA_SET},
-                    null, null, Phone.CONTACT_ID);
+            contactCursor = mResolver.query(myUri, new String[]{Phone.CONTACT_ID}, null, null,
+                    Phone.CONTACT_ID);
             if (contactCursor == null) {
                 return 0;
             }
-            mCursor = BluetoothPbapFixes.filterOutSimContacts(contactCursor);
-            return mCursor.getCount() + 1; // always has the 0.vcf
+            return getDistinctContactIdSize(contactCursor) + 1; // always has the 0.vcf
         } catch (CursorWindowAllocationException e) {
             Log.e(TAG, "CursorWindowAllocationException while getting Contacts size");
         } finally {
             if (contactCursor != null) {
                 contactCursor.close();
-            }
-            if (mCursor != null) {
-                mCursor.close();
-                mCursor = null;
             }
         }
         return 0;
@@ -273,7 +260,7 @@ public class BluetoothPbapVcardManager {
         if (ownerName == null || ownerName.length() == 0) {
             ownerName = BluetoothPbapService.getLocalPhoneName();
         }
-        nameList.add(ownerName + "," + "0");
+        nameList.add(ownerName);
         //End enhancement
 
         final Uri myUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
@@ -336,7 +323,7 @@ public class BluetoothPbapVcardManager {
         if (ownerName == null || ownerName.length() == 0) {
             ownerName = BluetoothPbapService.getLocalPhoneName();
         }
-        nameList.add(ownerName + "," + "0");
+        nameList.add(ownerName);
         // End enhancement
 
         final Uri myUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
@@ -346,8 +333,6 @@ public class BluetoothPbapVcardManager {
                     Phone.CONTACT_ID);
 
             ArrayList<String> contactNameIdList = new ArrayList<String>();
-            contactCursor = getContactNameIdList(contactCursor,
-                        contactNameIdList, mContext.getString(android.R.string.unknownName));
             appendDistinctNameIdList(contactNameIdList,
                     mContext.getString(android.R.string.unknownName), contactCursor);
 
@@ -580,7 +565,6 @@ public class BluetoothPbapVcardManager {
         try {
             contactCursor = mResolver.query(myUri, PHONES_CONTACTS_PROJECTION, null, null,
                     Phone.CONTACT_ID);
-            contactCursor = BluetoothPbapFixes.filterOutSimContacts(contactCursor);
             if (contactCursor != null) {
                 contactIdCursor =
                         ContactCursorFilter.filterByRange(contactCursor, startPoint, endPoint);
@@ -593,7 +577,7 @@ public class BluetoothPbapVcardManager {
             }
         }
 
-        if (BluetoothPbapFixes.isSupportedPbap12 && vcardselect) {
+        if (vcardselect) {
             return composeContactsAndSendSelectedVCards(op, contactIdCursor, vcardType21,
                     ownerVCard, needSendBody, pbSize, ignorefilter, filter, vcardselector,
                     vcardselectorop);
@@ -626,7 +610,6 @@ public class BluetoothPbapVcardManager {
         } catch (CursorWindowAllocationException e) {
             Log.e(TAG, "CursorWindowAllocationException while composing phonebook one vcard");
         } finally {
-            contactCursor = BluetoothPbapFixes.filterOutSimContacts(contactCursor);
             if (contactCursor != null) {
                 contactIdCursor = ContactCursorFilter.filterByOffset(contactCursor, offset);
                 contactCursor.close();
@@ -648,7 +631,6 @@ public class BluetoothPbapVcardManager {
          * @return a cursor containing contact id of {@code offset} contact.
          */
         public static Cursor filterByOffset(Cursor contactCursor, int offset) {
-            isPullVcardEntry = true;
             return filterByRange(contactCursor, offset, offset);
         }
 
@@ -669,10 +651,6 @@ public class BluetoothPbapVcardManager {
             final MatrixCursor contactIdsCursor = new MatrixCursor(new String[]{
                     Phone.CONTACT_ID
             });
-            if (startPoint == endPoint && isPullVcardEntry) {
-                return BluetoothPbapFixes.getVcardEntry(contactCursor,
-                        contactIdsCursor, contactIdColumn, startPoint);
-            }
             while (contactCursor.moveToNext() && currentOffset <= endPoint) {
                 long currentContactId = contactCursor.getLong(contactIdColumn);
                 if (previousContactId != currentContactId) {
@@ -1344,21 +1322,17 @@ public class BluetoothPbapVcardManager {
         final int contactIdColumn = cursor.getColumnIndex(Data.CONTACT_ID);
         final int idColumn = cursor.getColumnIndex(Data._ID);
         final int nameColumn = cursor.getColumnIndex(Data.DISPLAY_NAME);
-        final int accountIndex = cursor.getColumnIndex(Phone.ACCOUNT_TYPE_AND_DATA_SET);
         cursor.moveToPosition(-1);
         while (cursor.moveToNext()) {
             final long contactId =
                     cursor.getLong(contactIdColumn != -1 ? contactIdColumn : idColumn);
             String displayName = nameColumn != -1 ? cursor.getString(nameColumn) : defaultName;
-            String accountType = accountIndex != -1 ? cursor.getString(accountIndex) :
-                    BluetoothPbapFixes.getAccount(contactId);
             if (TextUtils.isEmpty(displayName)) {
                 displayName = defaultName;
             }
 
             String newString = displayName + "," + contactId;
-            if (!resultList.contains(newString) &&
-                    !(accountType != null && accountType.startsWith("com.android.sim"))) {
+            if (!resultList.contains(newString)) {
                 resultList.add(newString);
             }
         }
@@ -1367,37 +1341,5 @@ public class BluetoothPbapVcardManager {
                 Log.i(TAG, "appendDistinctNameIdList result: " + nameId);
             }
         }
-    }
-
-    /* creates name and id list of Non-sim contacts as display_name + "," + contact_id */
-    protected static Cursor getContactNameIdList(Cursor cursor,
-        ArrayList<String> contactIdList, String unknownName) {
-        if (cursor == null)
-            return null;
-        MatrixCursor mCursor = new MatrixCursor(new String[]{
-                    Phone.CONTACT_ID
-        });
-
-        long previousContactId = -1;
-        final int contactIdColumn = cursor.getColumnIndex(Data.CONTACT_ID);
-        final int idColumn = cursor.getColumnIndex(Data._ID);
-        final int nameColumn = cursor.getColumnIndex(Data.DISPLAY_NAME);
-        final int account_col_id = cursor.getColumnIndex(Phone.ACCOUNT_TYPE_AND_DATA_SET);
-        cursor.moveToPosition(-1);
-        while (cursor.moveToNext()) {
-             long currentContactId = contactIdColumn != -1 ? cursor.getLong(contactIdColumn)
-                    : cursor.getLong(idColumn);
-             String displayName = nameColumn != -1 ? cursor.getString(nameColumn)
-                    : unknownName;
-             String accType = cursor.getString(account_col_id);
-             if (previousContactId != currentContactId &&
-                    !(accType != null && accType.startsWith("com.android.sim"))) {
-                if (V) Log.v(TAG, displayName + "," + currentContactId);
-                previousContactId = currentContactId;
-                mCursor.addRow(new Long[]{currentContactId});
-                contactIdList.add(displayName + "," + Long.toString(currentContactId));
-             }
-        }
-        return mCursor;
     }
 }

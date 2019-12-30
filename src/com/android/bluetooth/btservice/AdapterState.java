@@ -69,21 +69,11 @@ final class AdapterState extends StateMachine {
     static final int BREDR_STOP_TIMEOUT = 10;
     static final int BLE_STOP_TIMEOUT = 11;
     static final int BLE_START_TIMEOUT = 12;
-    static final int BEGIN_BREDR_STOP = 13;
-    static final int STACK_DISABLED = 14;
-    static final int STACK_DISABLE_TIMEOUT = 15;
-    static final int BREDR_CLEANUP_TIMEOUT = 16;
-    static final int BT_FORCEKILL_TIMEOUT = 17;
 
-    // TODO: To be optimized : Increased BLE_START_TIMEOUT_DELAY to 6 sec
-    // as OMR1 Total timeout value was 14 seconds
-    static final int BLE_START_TIMEOUT_DELAY = 6000;
+    static final int BLE_START_TIMEOUT_DELAY = 4000;
     static final int BLE_STOP_TIMEOUT_DELAY = 1000;
     static final int BREDR_START_TIMEOUT_DELAY = 4000;
     static final int BREDR_STOP_TIMEOUT_DELAY = 4000;
-    static final int BREDR_CLEANUP_TIMEOUT_DELAY = 2000;
-    static final int STACK_DISABLE_TIMEOUT_DELAY = 8000;
-    static final int BT_FORCEKILL_TIMEOUT_DELAY = 100;
 
     private AdapterService mAdapterService;
     private TurningOnState mTurningOnState = new TurningOnState();
@@ -191,11 +181,6 @@ final class AdapterState extends StateMachine {
                     transitionTo(mTurningBleOnState);
                     break;
 
-                case BT_FORCEKILL_TIMEOUT:
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
-                    break;
-
                 default:
                     infoLog("Unhandled message - " + messageString(msg.what));
                     return false;
@@ -215,18 +200,11 @@ final class AdapterState extends StateMachine {
         public boolean processMessage(Message msg) {
             switch (msg.what) {
                 case USER_TURN_ON:
-                    mAdapterService.startBrEdrStartup();
                     transitionTo(mTurningOnState);
                     break;
 
                 case BLE_TURN_OFF:
                     transitionTo(mTurningBleOffState);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 default:
@@ -249,12 +227,6 @@ final class AdapterState extends StateMachine {
             switch (msg.what) {
                 case USER_TURN_OFF:
                     transitionTo(mTurningOffState);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 default:
@@ -294,16 +266,7 @@ final class AdapterState extends StateMachine {
 
                 case BLE_START_TIMEOUT:
                     errorLog(messageString(msg.what));
-                    mAdapterService.disableProfileServices(true);
-                    mAdapterService.StartHCIClose();
-                    errorLog("BLE_START_TIMEOUT is going to kill the process as part of cleanup");
-                    sendMessageDelayed(BT_FORCEKILL_TIMEOUT, BT_FORCEKILL_TIMEOUT_DELAY);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
+                    transitionTo(mTurningBleOffState);
                     break;
 
                 default:
@@ -343,16 +306,7 @@ final class AdapterState extends StateMachine {
 
                 case BREDR_START_TIMEOUT:
                     errorLog(messageString(msg.what));
-                    mAdapterService.disableProfileServices(false);
-                    mAdapterService.StartHCIClose();
-                    errorLog("BREDR_START_TIMEOUT is going to kill the process as part of cleanup");
-                    sendMessageDelayed(BT_FORCEKILL_TIMEOUT, BT_FORCEKILL_TIMEOUT_DELAY);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
+                    transitionTo(mTurningOffState);
                     break;
 
                 default:
@@ -373,9 +327,8 @@ final class AdapterState extends StateMachine {
         @Override
         public void enter() {
             super.enter();
-            Log.w(TAG,"Calling startBrEdrCleanup");
-            sendMessageDelayed(BREDR_CLEANUP_TIMEOUT, BREDR_CLEANUP_TIMEOUT_DELAY);
-            mAdapterService.startBrEdrCleanup();
+            sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
+            mAdapterService.stopProfileServices();
         }
 
         @Override
@@ -393,30 +346,7 @@ final class AdapterState extends StateMachine {
 
                 case BREDR_STOP_TIMEOUT:
                     errorLog(messageString(msg.what));
-                    mAdapterService.disableProfileServices(false);
-                    mAdapterService.StartHCIClose();
-                    errorLog("BREDR_STOP_TIMEOUT is going to kill the process as part of cleanup");
-                    sendMessageDelayed(BT_FORCEKILL_TIMEOUT, BT_FORCEKILL_TIMEOUT_DELAY);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
-                    break;
-
-                case BREDR_CLEANUP_TIMEOUT:
-                    errorLog("Error cleaningup Bluetooth profiles (cleanup timeout)");
-                    mAdapterService.disableProfileServices(false);
-                    mAdapterService.StartHCIClose();
-                    errorLog("BREDR_CLEANUP_TIMEOUT going to kill the process as part of cleanup");
-                    sendMessageDelayed(BT_FORCEKILL_TIMEOUT, BT_FORCEKILL_TIMEOUT_DELAY);
-                    break;
-
-                case BEGIN_BREDR_STOP:
-                    removeMessages(BREDR_CLEANUP_TIMEOUT);
-                    sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
-                    mAdapterService.stopProfileServices();
+                    transitionTo(mTurningBleOffState);
                     break;
 
                 default:
@@ -437,13 +367,8 @@ final class AdapterState extends StateMachine {
         @Override
         public void enter() {
             super.enter();
-            sendMessageDelayed(STACK_DISABLE_TIMEOUT, STACK_DISABLE_TIMEOUT_DELAY);
-            boolean ret = mAdapterService.disableNative();
-            if (!ret) {
-               removeMessages(STACK_DISABLE_TIMEOUT);
-               errorLog("Error while calling disableNative");
-               transitionTo(mBleOnState);
-            }
+            sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
+            mAdapterService.bringDownBle();
         }
 
         @Override
@@ -460,28 +385,8 @@ final class AdapterState extends StateMachine {
                     break;
 
                 case BLE_STOP_TIMEOUT:
-                    errorLog("Error stopping Bluetooth profiles (BLE stop timeout)");
                     errorLog(messageString(msg.what));
                     transitionTo(mOffState);
-                    break;
-
-                case STACK_DISABLED:
-                    removeMessages(STACK_DISABLE_TIMEOUT);
-                    sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
-                    mAdapterService.bringDownBle();
-                    break;
-
-                case STACK_DISABLE_TIMEOUT:
-                    mAdapterService.disableProfileServices(true);
-                    mAdapterService.StartHCIClose();
-                    errorLog("STACK_DISABLE_TIMEOUT going to kill the process as part of cleanup");
-                    sendMessageDelayed(BT_FORCEKILL_TIMEOUT, BT_FORCEKILL_TIMEOUT_DELAY);
-                    break;
-
-                case BT_FORCEKILL_TIMEOUT:
-                    transitionTo(mOffState);
-                    errorLog("Killing the process to force a restart as part of cleanup");
-                    android.os.Process.killProcess(android.os.Process.myPid());
                     break;
 
                 default:

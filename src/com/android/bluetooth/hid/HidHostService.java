@@ -47,7 +47,7 @@ import java.util.Map;
  * @hide
  */
 public class HidHostService extends ProfileService {
-    private static final boolean DBG = true;
+    private static final boolean DBG = false;
     private static final String TAG = "BluetoothHidHostService";
 
     private Map<BluetoothDevice, Integer> mInputDevices;
@@ -181,11 +181,7 @@ public class HidHostService extends ProfileService {
                         if (DBG) {
                             Log.d(TAG, "Incoming HID connection rejected");
                         }
-                        if (disconnectRemote(device)) {
-                            disconnectHidNative(Utils.getByteAddress(device));
-                        } else {
-                            virtualUnPlugNative(Utils.getByteAddress(device));
-                        }
+                        virtualUnPlugNative(Utils.getByteAddress(device));
                     } else {
                         broadcastConnectionState(device, convertHalState(halState));
                     }
@@ -819,46 +815,32 @@ public class HidHostService extends ProfileService {
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     public boolean okToConnect(BluetoothDevice device) {
         AdapterService adapterService = AdapterService.getAdapterService();
-        //check if it is inbound connection in Quiet mode, priority and Bond status
-        //to decide if its ok to allow this connection
-        if ((adapterService == null) || ((adapterService.isQuietModeEnabled()) && (mTargetDevice
-                == null)) || (BluetoothProfile.PRIORITY_OFF == getPriority(device)) || (
-                device.getBondState() == BluetoothDevice.BOND_NONE)) {
-             return false;
-         }
-
-        return true;
-    }
-
-    /**
-     * Check whether need to disconnect or virtual unplug remote device
-     * The check considers a number of factors during the evaluation.
-     *
-     * @param device the peer device to connect to
-     * @return true if remote device is to be disconnected, otherwise remote
-     * device needs to be virtually unplugged
-     */
-    private boolean disconnectRemote(BluetoothDevice device) {
-        AdapterService adapterService = AdapterService.getAdapterService();
         // Check if adapter service is null.
         if (adapterService == null) {
-            Log.w(TAG, "disconnectRemote: adapter service is null");
+            Log.w(TAG, "okToConnect: adapter service is null");
             return false;
         }
         // Check if this is an incoming connection in Quiet mode.
         if (adapterService.isQuietModeEnabled() && mTargetDevice == null) {
-            Log.w(TAG, "disconnectRemote: return false as quiet mode enabled");
+            Log.w(TAG, "okToConnect: return false as quiet mode enabled");
             return false;
         }
+        // Check priority and accept or reject the connection.
         int priority = getPriority(device);
         int bondState = adapterService.getBondState(device);
-        // Disconnect remote device if bonded and priroty is OFF
-        if (bondState == BluetoothDevice.BOND_BONDED &&
-                priority == BluetoothProfile.PRIORITY_OFF) {
-            Log.w(TAG, "disconnectRemote: return true");
-            return true;
+        // Allow this connection only if the device is bonded. Any attempt to connect while
+        // bonding would potentially lead to an unauthorized connection.
+        if (bondState != BluetoothDevice.BOND_BONDED) {
+            Log.w(TAG, "okToConnect: return false, bondState=" + bondState);
+            return false;
+        } else if (priority != BluetoothProfile.PRIORITY_UNDEFINED
+                && priority != BluetoothProfile.PRIORITY_ON
+                && priority != BluetoothProfile.PRIORITY_AUTO_CONNECT) {
+            // Otherwise, reject the connection if priority is not valid.
+            Log.w(TAG, "okToConnect: return false, priority=" + priority);
+            return false;
         }
-        return false;
+        return true;
     }
 
     private static int convertHalState(int halState) {

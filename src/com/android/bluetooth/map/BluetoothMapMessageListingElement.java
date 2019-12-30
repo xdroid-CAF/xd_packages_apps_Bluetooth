@@ -288,8 +288,7 @@ public class BluetoothMapMessageListingElement
         }
 
         if (mDateTime != 0) {
-            xmlMsgElement.attribute(null, "datetime",
-                    BluetoothMapUtils.getDateTimeString(this.getDateTime()));
+            xmlMsgElement.attribute(null, "datetime", this.getDateTimeString());
         }
         if (mSenderName != null) {
             xmlMsgElement.attribute(null, "sender_name",

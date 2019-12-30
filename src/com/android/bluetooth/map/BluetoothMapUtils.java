@@ -96,8 +96,6 @@ public class BluetoothMapUtils {
     static final int MAP_MESSAGE_LISTING_FORMAT_V10 = 10; // MAP spec below 1.3
     static final int MAP_MESSAGE_LISTING_FORMAT_V11 = 11; // MAP spec 1.3
 
-    private static boolean mSupportUtcTimeStamp = false;
-
     /**
      * This enum is used to convert from the bMessage type property to a type safe
      * type. Hence do not change the names of the enum values.
@@ -114,20 +112,12 @@ public class BluetoothMapUtils {
         }
     }
 
-    public static String getDateTimeString( long timestamp) {
-        String time = "";
-        if (mSupportUtcTimeStamp) {
-            SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmssZ");
-            Date date = new Date(timestamp);
-            time = format.format(date); // Format to YYYYMMDDTHHMMSS±hhmm UTC time ± offset
-        } else {
-            SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmss");
-            Date date = new Date(timestamp);
-            time = format.format(date); // Format to YYYYMMDDTHHMMSS local time
-        }
-        if (V) Log.v(TAG, "getDateTimeString  timestamp :" + timestamp + " time:" + time);
-        return time;
+    public static String getDateTimeString(long timestamp) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmss");
+        Date date = new Date(timestamp);
+        return format.format(date); // Format to YYYYMMDDTHHMMSS local time
     }
+
 
     public static void printCursor(Cursor c) {
         if (D) {
@@ -679,16 +669,6 @@ public class BluetoothMapUtils {
             //cannot happen
             return "";
         }
-    }
-
-    public static void setUtcTimeStamp(int remoteFeatureMask) {
-        if ((remoteFeatureMask & MAP_FEATURE_DEFINED_TIMESTAMP_FORMAT_BIT)
-                == MAP_FEATURE_DEFINED_TIMESTAMP_FORMAT_BIT) {
-            mSupportUtcTimeStamp = true;
-        } else {
-            mSupportUtcTimeStamp = false;
-        }
-        if (V) Log.v(TAG, "setUtcTimeStamp " + mSupportUtcTimeStamp);
     }
 
 }

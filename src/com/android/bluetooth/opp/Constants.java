@@ -194,9 +194,6 @@ public class Constants {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             "application/x-hwp",
-            "application/ogg",
-            "application/vnd.android.package-archive",
-            "text/comma-separated-values",
     };
 
     /** Where we store received files */
@@ -207,7 +204,7 @@ public class Constants {
 
     static final boolean DEBUG = true;
 
-    static final boolean VERBOSE = Log.isLoggable(TAG, Log.VERBOSE);;
+    static final boolean VERBOSE = false;
 
     static final int MAX_RECORDS_IN_DATABASE = 50;
 

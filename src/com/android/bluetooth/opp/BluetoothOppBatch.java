@@ -148,7 +148,6 @@ public class BluetoothOppBatch {
             BluetoothOppShareInfo info = mShares.get(i);
 
             if (info.mStatus < 200) {
-                BTOppUtils.updateFileNameInDb(mContext, info);
                 if (info.mDirection == BluetoothShare.DIRECTION_INBOUND && info.mFilename != null) {
                     new File(info.mFilename).delete();
                 }

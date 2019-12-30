@@ -24,7 +24,6 @@ import android.provider.Settings;
 import android.util.ArrayMap;
 import android.util.FeatureFlagUtils;
 import android.util.Log;
-import android.os.SystemProperties;
 
 import com.android.bluetooth.R;
 import com.android.bluetooth.a2dp.A2dpService;
@@ -44,7 +43,6 @@ import com.android.bluetooth.pan.PanService;
 import com.android.bluetooth.pbap.BluetoothPbapService;
 import com.android.bluetooth.pbapclient.PbapClientService;
 import com.android.bluetooth.sap.SapService;
-import com.android.bluetooth.ba.BATService;
 import com.android.server.SystemConfig;
 
 import java.util.ArrayList;
@@ -103,9 +101,7 @@ public class Config {
                     (1 << BluetoothProfile.PBAP)),
             new ProfileConfig(HearingAidService.class,
                     com.android.internal.R.bool.config_hearing_aid_profile_supported,
-                    (1 << BluetoothProfile.HEARING_AID)),
-            new ProfileConfig(BATService.class, R.bool.profile_supported_ba,
-                    (1 << BATService.BA_TRANSMITTER))
+                    (1 << BluetoothProfile.HEARING_AID))
     };
 
     private static Class[] sSupportedProfiles = new Class[0];
@@ -142,10 +138,6 @@ public class Config {
             }
 
             if (supported && !isProfileDisabled(ctx, config.mMask)) {
-                if (!addAudioProfiles(config.mClass.getSimpleName())) {
-                    Log.i(TAG, " Profile " + config.mClass.getSimpleName() + " Not added ");
-                    continue;
-                }
                 Log.v(TAG, "Adding " + config.mClass.getSimpleName());
                 profiles.add(config.mClass);
             }
@@ -181,38 +173,5 @@ public class Config {
                 Settings.Global.getLong(resolver, Settings.Global.BLUETOOTH_DISABLED_PROFILES, 0);
 
         return (disabledProfilesBitMask & profileMask) != 0;
-    }
-
-    private static synchronized boolean addAudioProfiles(String serviceName) {
-        Log.d(TAG," addAudioProfiles profile" + serviceName);
-        boolean isA2dpSink = SystemProperties.getBoolean(
-                "persist.vendor.service.bt.a2dp.sink", false);
-        Log.i(TAG, "addAudioProfiles isA2dpSink :" + isA2dpSink);
-        /* If property not enabled and request is for A2DPSinkService, don't add */
-        if ((serviceName.equals("A2dpSinkService")) && (!isA2dpSink))
-            return false;
-        if ((serviceName.equals("A2dpService")) && (isA2dpSink))
-            return false;
-
-        boolean isBAEnabled = SystemProperties.getBoolean("persist.vendor.service.bt.bca", false);
-
-        // Split A2dp will be enabled by default
-        boolean isSplitA2dpEnabled = true;
-        AdapterService adapterService = AdapterService.getAdapterService();
-
-        if (adapterService != null){
-            isSplitA2dpEnabled = adapterService.isSplitA2dpEnabled();
-            Log.v(TAG,"isSplitA2dpEnabled: " + isSplitA2dpEnabled);
-        } else {
-            Log.e(TAG,"adapterService is null");
-        }
-
-        if(serviceName.equals("BATService")) {
-            Log.d(TAG," isBAEnabled = " + isBAEnabled
-                          + " isSplitEnabled " + isSplitA2dpEnabled);
-            return isBAEnabled && isSplitA2dpEnabled;
-        }
-        // always return true for other profiles
-        return true;
     }
 }

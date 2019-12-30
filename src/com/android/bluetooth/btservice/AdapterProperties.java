@@ -45,6 +45,8 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.StatsLog;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.RemoteDevices.DeviceProperties;
 
@@ -62,14 +64,10 @@ class AdapterProperties {
             "persist.bluetooth.maxconnectedaudiodevices";
     static final int MAX_CONNECTED_AUDIO_DEVICES_LOWER_BOND = 1;
     private static final int MAX_CONNECTED_AUDIO_DEVICES_UPPER_BOUND = 5;
-    private static final int BLUETOOTH_NAME_MAX_LENGTH_BYTES = 248;
-
-    private static final String A2DP_OFFLOAD_ENABLE_PROPERTY =
-            "persist.bluetooth.a2dp_offload.enable";
-    private static final String A2DP_OFFLOAD_DISABLED_PROPERTY =
-            "persist.bluetooth.a2dp_offload.disabled";
     private static final String A2DP_OFFLOAD_SUPPORTED_PROPERTY =
             "ro.bluetooth.a2dp_offload.supported";
+    private static final String A2DP_OFFLOAD_DISABLED_PROPERTY =
+            "persist.bluetooth.a2dp_offload.disabled";
 
     private static final long DEFAULT_DISCOVERY_TIMEOUT_MS = 12800;
     private static final int BD_ADDR_LEN = 6; // in bytes
@@ -86,18 +84,7 @@ class AdapterProperties {
     private CopyOnWriteArrayList<BluetoothDevice> mBondedDevices =
             new CopyOnWriteArrayList<BluetoothDevice>();
 
-    private final class ProfilesConnectionState {
-        public int mProfilesConnecting, mProfilesConnected, mProfilesDisconnecting;
-
-        ProfilesConnectionState(int connecting, int connected, int disconnecting) {
-          mProfilesConnecting    = connecting;
-          mProfilesConnected     = connected;
-          mProfilesDisconnecting = disconnecting;
-        }
-    }
-    private final HashMap<BluetoothDevice, ProfilesConnectionState> mDevicesConnectionState =
-            new HashMap<>();
-
+    private int mProfilesConnecting, mProfilesConnected, mProfilesDisconnecting;
     private final HashMap<Integer, Pair<Integer, Integer>> mProfileConnectionState =
             new HashMap<>();
 
@@ -127,36 +114,6 @@ class AdapterProperties {
     private boolean mIsLeExtendedAdvertisingSupported;
     private boolean mIsLePeriodicAdvertisingSupported;
     private int mLeMaximumAdvertisingDataLength;
-    private boolean mWiPowerFastbootEnabled;
-    private boolean mSplitA2DPScrambleDataRequired;
-    private boolean mSplitA2DP44p1KhzSampleFreq;
-    private boolean mSplitA2DP48KhzSampleFreq;
-    private boolean mSplitA2DPSingleVSCommandSupport;
-    private boolean mSplitA2DPSourceSBCEncoding;
-    private boolean mSplitA2DPSourceSBC;
-    private boolean mSplitA2DPSourceMP3;
-    private boolean mSplitA2DPSourceAAC;
-    private boolean mSplitA2DPSourceLDAC;
-    private boolean mSplitA2DPSourceAPTX;
-    private boolean mSplitA2DPSourceAPTXHD;
-    private boolean mSplitA2DPSourceAPTXADAPTIVE;
-    private boolean mSplitA2DPSourceAPTXTWSPLUS;
-    private boolean mSplitA2DPSinkSBC;
-    private boolean mSplitA2DPSinkMP3;
-    private boolean mSplitA2DPSinkAAC;
-    private boolean mSplitA2DPSinkLDAC;
-    private boolean mSplitA2DPSinkAPTX;
-    private boolean mSplitA2DPSinkAPTXHD;
-    private boolean mSplitA2DPSinkAPTXADAPTIVE;
-    private boolean mSplitA2DPSinkAPTXTWSPLUS;
-    private boolean mVoiceDualSCO;
-    private boolean mVoiceTWSPLUSeSCOAG;
-    private boolean mSWBVoicewithAptxAdaptiveAG;
-    private boolean mBroadcastAudioTxwithEC_2_5;
-    private boolean mBroadcastAudioTxwithEC_3_9;
-    private boolean mBroadcastAudioRxwithEC_2_5;
-    private boolean mBroadcastAudioRxwithEC_3_9;
-    private boolean mAddonFeaturesSupported;
 
     private boolean mReceiverRegistered;
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -229,7 +186,6 @@ class AdapterProperties {
 
     public void init(RemoteDevices remoteDevices) {
         mProfileConnectionState.clear();
-        mDevicesConnectionState.clear();
         mRemoteDevices = remoteDevices;
 
         // Get default max connected audio devices from config.xml in frameworks/base/core
@@ -242,12 +198,6 @@ class AdapterProperties {
         // Make sure the final value of max connected audio devices is within allowed range
         mMaxConnectedAudioDevices = Math.min(Math.max(propertyOverlayedMaxConnectedAudioDevices,
                 MAX_CONNECTED_AUDIO_DEVICES_LOWER_BOND), MAX_CONNECTED_AUDIO_DEVICES_UPPER_BOUND);
-        // if QTI stack, overwrite max audio connections to 2
-        if(mService.isVendorIntfEnabled() && mMaxConnectedAudioDevices > 5) {
-            Log.i(TAG, "overwriting mMaxConnectedAudioDevices to 5 for vendor stack");
-            mMaxConnectedAudioDevices = 5;
-        }
-
         Log.i(TAG, "init(), maxConnectedAudioDevices, default="
                 + configDefaultMaxConnectedAudioDevices + ", propertyOverlayed="
                 + propertyOverlayedMaxConnectedAudioDevices + ", finalValue="
@@ -279,14 +229,11 @@ class AdapterProperties {
         mRemoteDevices = null;
         mProfileConnectionState.clear();
         if (mReceiverRegistered) {
-            if (mReceiver != null) {
-                mService.unregisterReceiver(mReceiver);
-            }
+            mService.unregisterReceiver(mReceiver);
             mReceiverRegistered = false;
         }
         mService = null;
         mBondedDevices.clear();
-        mDevicesConnectionState.clear();
     }
 
     @Override
@@ -307,9 +254,6 @@ class AdapterProperties {
      */
     boolean setName(String name) {
         synchronized (mObject) {
-            if (name.length() > BLUETOOTH_NAME_MAX_LENGTH_BYTES) {
-                name =  name.substring(0, BLUETOOTH_NAME_MAX_LENGTH_BYTES);
-            }
             return mService.setAdapterPropertyNative(AbstractionLayer.BT_PROPERTY_BDNAME,
                     name.getBytes());
         }
@@ -537,12 +481,6 @@ class AdapterProperties {
     }
 
     /**
-     * @param set the maximum number of connected audio devices
-     */
-    void setMaxConnectedAudioDevices(int maxConnectedAudioDevices) {
-         mMaxConnectedAudioDevices = maxConnectedAudioDevices;
-    }
-    /**
      * @return the maximum number of connected audio devices
      */
     int getMaxConnectedAudioDevices() {
@@ -554,215 +492,6 @@ class AdapterProperties {
      */
     boolean isA2dpOffloadEnabled() {
         return mA2dpOffloadEnabled;
-    }
-
-    /**
-     * @return Wipower Fastboot status
-     */
-    boolean isWipowerFastbootEnabled() {
-        return mWiPowerFastbootEnabled;
-    }
-
-    /**
-     * @return Split A2DP Scramble Data Support status
-     */
-    boolean isSplitA2DPScrambleDataRequired() {
-        return mSplitA2DPScrambleDataRequired;
-    }
-
-    /**
-     * @return Split A2DP 44.1Khz Sample Freq status
-     */
-    boolean isSplitA2DP44p1KhzSampleFreq() {
-        return mSplitA2DP44p1KhzSampleFreq;
-    }
-
-    /**
-     * @return Split A2DP 48Khz Sample Freq status
-     */
-    boolean isSplitA2DP48KhzSampleFreq() {
-        return mSplitA2DP48KhzSampleFreq;
-    }
-    /**
-     * @return Split A2DP Single VS Command Support status
-     */
-    boolean isSplitA2DPSingleVSCommandSupport() {
-        return mSplitA2DPSingleVSCommandSupport;
-    }
-
-    /**
-     * @return Split A2DP Source SBC Encoding status
-     */
-    boolean isSplitA2DPSourceSBCEncoding() {
-        return mSplitA2DPSourceSBCEncoding;
-    }
-
-    /**
-     * @return Split A2DP Source SBC status
-     */
-    boolean isSplitA2DPSourceSBC() {
-        return mSplitA2DPSourceSBC;
-    }
-
-    /**
-     * @return Split A2DP Source MP3 status
-     */
-    boolean isSplitA2DPSourceMP3() {
-        return mSplitA2DPSourceMP3;
-    }
-
-    /**
-     * @return Split A2DP Source AAC status
-     */
-    boolean isSplitA2DPSourceAAC() {
-        return mSplitA2DPSourceAAC;
-    }
-
-    /**
-     * @return Split A2DP Source LDAC status
-     */
-    boolean isSplitA2DPSourceLDAC() {
-        return mSplitA2DPSourceLDAC;
-    }
-
-    /**
-     * @return Split A2DP Source APTX status
-     */
-    boolean isSplitA2DPSourceAPTX() {
-        return mSplitA2DPSourceAPTX;
-    }
-
-    /**
-     * @return Split A2DP Source APTXHD status
-     */
-    boolean isSplitA2DPSourceAPTXHD() {
-        return mSplitA2DPSourceAPTXHD;
-    }
-
-    /**
-     * @return Split A2DP Source APTXADAPTIVE status
-     */
-    boolean isSplitA2DPSourceAPTXADAPTIVE() {
-        return mSplitA2DPSourceAPTXADAPTIVE;
-    }
-
-    /**
-     * @return Split A2DP Source APTXTWSPLUS status
-     */
-    boolean isSplitA2DPSourceAPTXTWSPLUS() {
-        return mSplitA2DPSourceAPTXTWSPLUS;
-    }
-
-    /**
-     * @return Split A2DP Sink SBC status
-     */
-    boolean isSplitA2DPSinkSBC() {
-        return mSplitA2DPSinkSBC;
-    }
-
-    /**
-     * @return Split A2DP Sink MP3 status
-     */
-    boolean isSplitA2DPSinkMP3() {
-        return mSplitA2DPSinkMP3;
-    }
-
-    /**
-     * @return Split A2DP Sink AAC status
-     */
-    boolean isSplitA2DPSinkAAC() {
-        return mSplitA2DPSinkAAC;
-    }
-
-    /**
-     * @return Split A2DP Sink LDAC status
-     */
-    boolean isSplitA2DPSinkLDAC() {
-        return mSplitA2DPSinkLDAC;
-    }
-
-    /**
-     * @return Split A2DP Sink APTX status
-     */
-    boolean isSplitA2DPSinkAPTX() {
-        return mSplitA2DPSinkAPTX;
-    }
-
-    /**
-     * @return Split A2DP Sink APTXHD status
-     */
-    boolean isSplitA2DPSinkAPTXHD() {
-        return mSplitA2DPSinkAPTXHD;
-    }
-
-    /**
-     * @return Split A2DP Sink APTXADAPTIVE status
-     */
-    boolean isSplitA2DPSinkAPTXADAPTIVE() {
-        return mSplitA2DPSinkAPTXADAPTIVE;
-    }
-
-    /**
-     * @return Split A2DP Sink APTXTWSPLUS status
-     */
-    boolean isSplitA2DPSinkAPTXTWSPLUS() {
-        return mSplitA2DPSinkAPTXTWSPLUS;
-    }
-
-    /**
-     * @return mVoiceDualSCO status
-     */
-    boolean isVoiceDualSCO() {
-        return mVoiceDualSCO;
-    }
-
-    /**
-     * @return Voice TWS+ eSCO AG status
-     */
-    boolean isVoiceTWSPLUSeSCOAG() {
-        return mVoiceTWSPLUSeSCOAG;
-    }
-
-    /**
-     * @return SWB Voice with Aptx Adaptive AG status
-     */
-    boolean isSWBVoicewithAptxAdaptiveAG() {
-        return mSWBVoicewithAptxAdaptiveAG;
-    }
-
-    /**
-     * @return Broadcast Audio Tx with EC_2_5 status
-     */
-    boolean isBroadcastAudioTxwithEC_2_5() {
-        return mBroadcastAudioTxwithEC_2_5;
-    }
-
-    /**
-     * @return Broadcast Audio Tx with EC_3_9 status
-     */
-    boolean isBroadcastAudioTxwithEC_3_9() {
-        return mBroadcastAudioTxwithEC_3_9;
-    }
-
-    /**
-     * @return Broadcast Audio Rx with EC_2_5 status
-     */
-    boolean isBroadcastAudioRxwithEC_2_5() {
-        return mBroadcastAudioRxwithEC_2_5;
-    }
-
-    /**
-     * @return Broadcast Audio Rx with EC_3_9 status
-     */
-    boolean isBroadcastAudioRxwithEC_3_9() {
-        return mBroadcastAudioRxwithEC_3_9;
-    }
-
-    /**
-     * @return Broadcast AddonFeatures Cmd Support status
-     */
-    boolean isAddonFeaturesCmdSupported() {
-        return mAddonFeaturesSupported;
     }
 
     /**
@@ -781,6 +510,7 @@ class AdapterProperties {
 
     // This function shall be invoked from BondStateMachine whenever the bond
     // state changes.
+    @VisibleForTesting
     void onBondStateChanged(BluetoothDevice device, int state) {
         if (device == null) {
             Log.w(TAG, "onBondStateChanged, device is null");
@@ -800,20 +530,12 @@ class AdapterProperties {
                     debugLog("Adding bonded device:" + device);
                     mBondedDevices.add(device);
                 }
-                if (!mDevicesConnectionState.containsKey(device)) {
-                    debugLog("Adding connection state:" + device);
-                    mDevicesConnectionState.put(device, new ProfilesConnectionState(0, 0, 0));
-                }
             } else if (state == BluetoothDevice.BOND_NONE) {
                 // remove device from list
                 if (mBondedDevices.remove(device)) {
                     debugLog("Removing bonded device:" + device);
                 } else {
                     debugLog("Failed to remove device: " + device);
-                }
-                if (mDevicesConnectionState.containsKey(device)) {
-                    debugLog("Removing connection state:" + device);
-                    mDevicesConnectionState.remove(device);
                 }
             }
         } catch (Exception ee) {
@@ -880,22 +602,10 @@ class AdapterProperties {
             return;
         }
 
-
         synchronized (mObject) {
-
             updateProfileConnectionState(profile, state, prevState);
 
-            boolean validateConnectionState = false;
-
-            try {
-                validateConnectionState =
-                   updateCountersAndCheckForConnectionStateChange(device, state, prevState);
-            } catch (IllegalStateException ee) {
-                Log.w(TAG, "ADAPTER_CONNECTION_STATE_CHANGE: unexpected transition for profile="
-                        + profile + ", " + prevState + " -> " + state);
-            }
-
-            if (validateConnectionState) {
+            if (updateCountersAndCheckForConnectionStateChange(state, prevState)) {
                 int newAdapterState = convertToAdapterState(state);
                 int prevAdapterState = convertToAdapterState(prevState);
                 setConnectionState(newAdapterState);
@@ -953,45 +663,33 @@ class AdapterProperties {
         }
     }
 
-    private boolean updateCountersAndCheckForConnectionStateChange(BluetoothDevice device,
-            int state, int prevState) {
-        if(!mDevicesConnectionState.containsKey(device)) {
-            Log.e(TAG, "Can't find device connection record, adding new one: " + device);
-            mDevicesConnectionState.put(device, new ProfilesConnectionState(0, 0, 0));
-        }
-        ProfilesConnectionState connstate = mDevicesConnectionState.get(device);
-
-        Log.e(TAG, "prevState=" + prevState + " -> State=" + state +
-            " mProfilesConnecting=" + connstate.mProfilesConnecting +
-            " mProfilesConnected=" + connstate.mProfilesConnected +
-            " mProfilesDisconnecting=" + connstate.mProfilesDisconnecting);
-
+    private boolean updateCountersAndCheckForConnectionStateChange(int state, int prevState) {
         switch (prevState) {
             case BluetoothProfile.STATE_CONNECTING:
-                if (connstate.mProfilesConnecting > 0) {
-                    connstate.mProfilesConnecting--;
+                if (mProfilesConnecting > 0) {
+                    mProfilesConnecting--;
                 } else {
-                    Log.e(TAG, "mProfilesConnecting " + connstate.mProfilesConnecting);
+                    Log.e(TAG, "mProfilesConnecting " + mProfilesConnecting);
                     throw new IllegalStateException(
                             "Invalid state transition, " + prevState + " -> " + state);
                 }
                 break;
 
             case BluetoothProfile.STATE_CONNECTED:
-                if (connstate.mProfilesConnected > 0) {
-                    connstate.mProfilesConnected--;
+                if (mProfilesConnected > 0) {
+                    mProfilesConnected--;
                 } else {
-                    Log.e(TAG, "mProfilesConnected " + connstate.mProfilesConnected);
+                    Log.e(TAG, "mProfilesConnected " + mProfilesConnected);
                     throw new IllegalStateException(
                             "Invalid state transition, " + prevState + " -> " + state);
                 }
                 break;
 
             case BluetoothProfile.STATE_DISCONNECTING:
-                if (connstate.mProfilesDisconnecting > 0) {
-                    connstate.mProfilesDisconnecting--;
+                if (mProfilesDisconnecting > 0) {
+                    mProfilesDisconnecting--;
                 } else {
-                    Log.e(TAG, "mProfilesDisconnecting " + connstate.mProfilesDisconnecting);
+                    Log.e(TAG, "mProfilesDisconnecting " + mProfilesDisconnecting);
                     throw new IllegalStateException(
                             "Invalid state transition, " + prevState + " -> " + state);
                 }
@@ -1000,19 +698,19 @@ class AdapterProperties {
 
         switch (state) {
             case BluetoothProfile.STATE_CONNECTING:
-                connstate.mProfilesConnecting++;
-                return (connstate.mProfilesConnected == 0 && connstate.mProfilesConnecting == 1);
+                mProfilesConnecting++;
+                return (mProfilesConnected == 0 && mProfilesConnecting == 1);
 
             case BluetoothProfile.STATE_CONNECTED:
-                connstate.mProfilesConnected++;
-                return (connstate.mProfilesConnected == 1);
+                mProfilesConnected++;
+                return (mProfilesConnected == 1);
 
             case BluetoothProfile.STATE_DISCONNECTING:
-                connstate.mProfilesDisconnecting++;
-                return (connstate.mProfilesConnected == 0 && connstate.mProfilesDisconnecting == 1);
+                mProfilesDisconnecting++;
+                return (mProfilesConnected == 0 && mProfilesDisconnecting == 1);
 
             case BluetoothProfile.STATE_DISCONNECTED:
-                return (connstate.mProfilesConnected == 0 && connstate.mProfilesConnecting == 0);
+                return (mProfilesConnected == 0 && mProfilesConnecting == 0);
 
             default:
                 return true;
@@ -1193,78 +891,6 @@ class AdapterProperties {
                 + " mLeMaximumAdvertisingDataLength = " + mLeMaximumAdvertisingDataLength);
     }
 
-    public void updateSocFeatureSupport(byte[] val) {
-        mAddonFeaturesSupported = (val.length != 0);
-        if (!mAddonFeaturesSupported) {
-            Log.d(TAG, "BT_PROPERTY_ADD_ON_FEATURES: add-on features VSC is not supported");
-        } else {
-            mWiPowerFastbootEnabled = ((0x01 & ((int) val[0])) != 0);
-            mSplitA2DPScrambleDataRequired = ((0x02 & ((int) val[0])) != 0);
-            mSplitA2DP44p1KhzSampleFreq = ((0x04 & ((int) val[0])) != 0);
-            mSplitA2DP48KhzSampleFreq = ((0x08 & ((int) val[0])) != 0);
-            mSplitA2DPSingleVSCommandSupport = ((0x10 & ((int) val[0])) != 0);
-            mSplitA2DPSourceSBCEncoding = ((0x20 & ((int) val[0])) != 0);
-            mSplitA2DPSourceSBC = ((0x01 & ((int) val[1])) != 0);
-            mSplitA2DPSourceMP3 = ((0x02 & ((int) val[1])) != 0);
-            mSplitA2DPSourceAAC = ((0x04 & ((int) val[1])) != 0);
-            mSplitA2DPSourceLDAC = ((0x08 & ((int) val[1])) != 0);
-            mSplitA2DPSourceAPTX = ((0x10 & ((int) val[1])) != 0);
-            mSplitA2DPSourceAPTXHD = ((0x20 & ((int) val[1])) != 0);
-            mSplitA2DPSourceAPTXADAPTIVE = ((0x40 & ((int) val[1])) != 0);
-            mSplitA2DPSourceAPTXTWSPLUS = ((0x80 & ((int) val[1])) != 0);
-            mSplitA2DPSinkSBC = ((0x01 & ((int) val[2])) != 0);
-            mSplitA2DPSinkMP3 = ((0x02 & ((int) val[2])) != 0);
-            mSplitA2DPSinkAAC = ((0x04 & ((int) val[2])) != 0);
-            mSplitA2DPSinkLDAC = ((0x08 & ((int) val[2])) != 0);
-            mSplitA2DPSinkAPTX = ((0x10 & ((int) val[2])) != 0);
-            mSplitA2DPSinkAPTXHD = ((0x20 & ((int) val[2])) != 0);
-            mSplitA2DPSinkAPTXADAPTIVE = ((0x40 & ((int) val[2])) != 0);
-            mSplitA2DPSinkAPTXTWSPLUS = ((0x80 & ((int) val[2])) != 0);
-            mVoiceDualSCO = ((0x01 & ((int) val[3])) != 0);
-            mVoiceTWSPLUSeSCOAG = ((0x02 & ((int) val[3])) != 0);
-            mSWBVoicewithAptxAdaptiveAG = ((0x04 & ((int) val[3])) != 0);
-            mBroadcastAudioTxwithEC_2_5 = ((0x01 & ((int) val[4])) != 0);
-            mBroadcastAudioTxwithEC_3_9 = ((0x02 & ((int) val[4])) != 0);
-            mBroadcastAudioRxwithEC_2_5 = ((0x04 & ((int) val[4])) != 0);
-            mBroadcastAudioRxwithEC_3_9 = ((0x08 & ((int) val[4])) != 0);
-
-
-            Log.d(TAG, "BT_PROPERTY_ADD_ON_FEATURES: update from BT controller"
-                    + "\n mWiPowerFastbootEnabled = "
-                    + mWiPowerFastbootEnabled + "\n SplitA2DPScrambleDataRequired = "
-                    + mSplitA2DPScrambleDataRequired + "\n mSplitA2DP44p1KhzSampleFreq = "
-                    + mSplitA2DP44p1KhzSampleFreq + "\n mSplitA2DP48KhzSampleFreq = "
-                    + mSplitA2DP48KhzSampleFreq + "\n mSplitA2DPSingleVSCommandSupport = "
-                    + mSplitA2DPSingleVSCommandSupport + "\n mSplitA2DPSourceSBCEncoding = "
-                    + mSplitA2DPSourceSBCEncoding + "\n mSplitA2DPSourceSBC = "
-                    + mSplitA2DPSourceSBC + "\n mSplitA2DPSourceMP3 = "
-                    + mSplitA2DPSourceMP3 + "\n mSplitA2DPSourceAAC = "
-                    + mSplitA2DPSourceAAC + "\n mSplitA2DPSourceLDAC = " + mSplitA2DPSourceLDAC
-                    + "\n mSplitA2DPSourceAPTX = " + mSplitA2DPSourceAPTX
-                    + "\n mSplitA2DPSourceAPTXHD = " + mSplitA2DPSourceAPTXHD
-                    + "\n mSplitA2DPSourceAPTXADAPTIVE = " + mSplitA2DPSourceAPTXADAPTIVE
-                    + "\n mSplitA2DPSourceAPTXTWSPLUS = " + mSplitA2DPSourceAPTXTWSPLUS
-                    + "\n mSplitA2DPSinkSBC = " + mSplitA2DPSinkSBC + "\n mSplitA2DPSinkMP3 = "
-                    + mSplitA2DPSinkMP3 + "\n mSplitA2DPSinkAAC = "
-                    + mSplitA2DPSinkAAC + "\n mSplitA2DPSinkLDAC = " + mSplitA2DPSinkLDAC
-                    + "\n mSplitA2DPSinkAPTX = " + mSplitA2DPSinkAPTX
-                    + "\n mSplitA2DPSinkAPTXHD = " + mSplitA2DPSinkAPTXHD
-                    + "\n mSplitA2DPSinkAPTXADAPTIVE = " + mSplitA2DPSinkAPTXADAPTIVE
-                    + "\n mSplitA2DPSinkAPTXTWSPLUS = " + mSplitA2DPSinkAPTXTWSPLUS
-                    + "\n mVoiceDualSCO = " + mVoiceDualSCO + "\n mVoiceTWSPLUSeSCOAG = "
-                    + mVoiceTWSPLUSeSCOAG + "\n mSWBVoicewithAptxAdaptiveAG = "
-                    + mSWBVoicewithAptxAdaptiveAG + "\n BroadcastAudioTxwithEC_2_5 = "
-                    + mBroadcastAudioTxwithEC_2_5 + "\n mBroadcastAudioTxwithEC_3_9 = "
-                    + mBroadcastAudioTxwithEC_3_9 + "\n mBroadcastAudioRxwithEC_2_5 = "
-                    + mBroadcastAudioRxwithEC_2_5 + "\n mBroadcastAudioRxwithEC_3_9= "
-                    + mBroadcastAudioRxwithEC_3_9);
-         }
-    }
-
-    public void updateHostFeatureSupport(byte[] val) {
-         Log.d(TAG, " Host Features are not supported currently ");
-    }
-
     void onBluetoothReady() {
         debugLog("onBluetoothReady, state=" + BluetoothAdapter.nameForState(getState())
                 + ", ScanMode=" + mScanMode);
@@ -1273,8 +899,9 @@ class AdapterProperties {
             // Reset adapter and profile connection states
             setConnectionState(BluetoothAdapter.STATE_DISCONNECTED);
             mProfileConnectionState.clear();
-            mDevicesConnectionState.clear();
-
+            mProfilesConnected = 0;
+            mProfilesConnecting = 0;
+            mProfilesDisconnecting = 0;
             // adapterPropertyChangedCallback has already been received.  Set the scan mode.
             setScanMode(AbstractionLayer.BT_SCAN_MODE_CONNECTABLE);
             // This keeps NV up-to date on first-boot after flash.
@@ -1293,7 +920,7 @@ class AdapterProperties {
         infoLog("Callback:discoveryStateChangeCallback with state:" + state);
         synchronized (mObject) {
             Intent intent;
-            if ((state == AbstractionLayer.BT_DISCOVERY_STOPPED) && mDiscovering) {
+            if (state == AbstractionLayer.BT_DISCOVERY_STOPPED) {
                 mDiscovering = false;
                 mService.clearDiscoveringPackages();
                 mDiscoveryEndMs = System.currentTimeMillis();

@@ -40,12 +40,10 @@ public class BluetoothMapAccountItem implements Comparable<BluetoothMapAccountIt
     public final String mBase_uri_no_account;
     private final String mUci;
     private final String mUciPrefix;
-    private String mDisplayName;
-    private String mEmailAddress;
 
     public BluetoothMapAccountItem(String id, String name, String packageName, String authority,
             Drawable icon, BluetoothMapUtils.TYPE appType, String uci, String uciPrefix) {
-        this.mName = name + " Server " + id;
+        this.mName = name;
         this.mIcon = icon;
         this.mPackageName = packageName;
         this.mId = id;
@@ -230,23 +228,4 @@ public class BluetoothMapAccountItem implements Comparable<BluetoothMapAccountIt
         return mType;
     }
 
-    public void setDisplayName(String name) {
-        mDisplayName = name;
-        if(V) Log.v(TAG, "setDispName: " + mDisplayName );
-    }
-
-    public void setEmailAddress(String emailId) {
-        mEmailAddress = emailId;
-        if(V) Log.v(TAG, "setOrgEmail: " + mEmailAddress );
-    }
-
-    public String getDisplayName() {
-        if(V) Log.v(TAG, "getDispName: " + mDisplayName );
-        return mDisplayName;
-    }
-
-    public String getEmailAddress() {
-        if(V) Log.v(TAG, "getOrgEmail: " + mDisplayName );
-        return mEmailAddress;
-    }
 }

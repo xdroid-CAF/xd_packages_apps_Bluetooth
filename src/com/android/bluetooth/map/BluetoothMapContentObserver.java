@@ -113,7 +113,7 @@ public class BluetoothMapContentObserver {
     private static final long EVENT_FILTER_CONVERSATION_CHANGED = 1L << 10;
     private static final long EVENT_FILTER_PARTICIPANT_PRESENCE_CHANGED = 1L << 11;
     private static final long EVENT_FILTER_PARTICIPANT_CHATSTATE_CHANGED = 1L << 12;
-    private static final long EVENT_FILTER_MESSAGE_REMOVED = 1L << 14;
+    private static final long EVENT_FILTER_MESSAGE_REMOVED = 1L << 13;
 
     // TODO: If we are requesting a large message from the network, on a slow connection
     //       20 seconds might not be enough... But then again 20 seconds is long for other
@@ -149,7 +149,7 @@ public class BluetoothMapContentObserver {
      * Actually we only ever use the lower 4 bytes of this variable,
      * hence we could manage without the volatile keyword, but as
      * we tend to copy ways of doing things, we better do it right:-) */
-    protected volatile long mEventFilter = 0xFFFFFFFFL;
+    private volatile long mEventFilter = 0xFFFFFFFFL;
 
     public static final int DELETED_THREAD_ID = -1;
 
@@ -312,7 +312,8 @@ public class BluetoothMapContentObserver {
     }
 
     public void setObserverRemoteFeatureMask(int remoteSupportedFeatures) {
-        mMapSupportedFeatures = remoteSupportedFeatures;
+        mMapSupportedFeatures =
+                remoteSupportedFeatures & BluetoothMapMasInstance.SDP_MAP_MAS_FEATURES;
         if ((BluetoothMapUtils.MAP_FEATURE_EXTENDED_EVENT_REPORT_11_BIT & mMapSupportedFeatures)
                 != 0) {
             mMapEventReportVersion = BluetoothMapUtils.MAP_EVENT_REPORT_V11;
@@ -329,9 +330,9 @@ public class BluetoothMapContentObserver {
                     + " were set, mMapSupportedFeatures=" + mMapSupportedFeatures);
         }
         if (D) {
-            Log.d(TAG, "setObserverRemoteFeatureMask: mMapEventReportVersion="
-                    + mMapEventReportVersion + " mMapSupportedFeatures="
-                    + Integer.toHexString(mMapSupportedFeatures));
+            Log.d(TAG,
+                    "setObserverRemoteFeatureMask: mMapEventReportVersion=" + mMapEventReportVersion
+                            + " mMapSupportedFeatures=" + mMapSupportedFeatures);
         }
     }
 
@@ -587,7 +588,7 @@ public class BluetoothMapContentObserver {
         }
     }
 
-    class Event {
+    private class Event {
         public String eventType;
         public long handle;
         public String folder = null;
@@ -834,8 +835,6 @@ public class BluetoothMapContentObserver {
         public long folderId = -1;     // Email folder ID
         public long oldFolderId = -1;  // Used for email undelete
         public boolean localInitiatedSend = false; // Used for MMS to filter out events
-        boolean localInitiatedReadStatus = false; // Used for SetMsgStatusRead to filter out event
-        boolean localInitiatedShift = false; // Used for SetMsgStatusDelete to filter out events
         public boolean transparent = false;
         // Used for EMAIL to delete message sent with transparency
         public int flagRead = -1;      // Message status read/unread
@@ -1533,14 +1532,10 @@ public class BluetoothMapContentObserver {
                     c.close();
                 }
             }
-            String eventType = EVENT_TYPE_DELETE;
+
             for (Msg msg : getMsgListSms().values()) {
                 // "old_folder" used only for MessageShift event
-                if (mMapEventReportVersion >= BluetoothMapUtils.MAP_EVENT_REPORT_V12) {
-                    eventType = EVENT_TYPE_REMOVED;
-                    if (V) Log.v(TAG," sent EVENT_TYPE_REMOVED");
-                }
-                Event evt = new Event(eventType, msg.id, getSmsFolderName(msg.type), null,
+                Event evt = new Event(EVENT_TYPE_DELETE, msg.id, getSmsFolderName(msg.type), null,
                         mSmsType);
                 sendEvent(evt);
                 listChanged = true;

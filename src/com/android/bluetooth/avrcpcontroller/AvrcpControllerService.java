@@ -45,8 +45,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AvrcpControllerService extends ProfileService {
     static final String TAG = "AvrcpControllerService";
     static final int MAXIMUM_CONNECTED_DEVICES = 5;
-    static final boolean DBG = true;
-    static final boolean VDBG = true;
+    static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
+    static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
 
     public static final String MEDIA_ITEM_UID_KEY = "media-item-uid-key";
     /*
@@ -90,13 +90,6 @@ public class AvrcpControllerService extends ProfileService {
     public static final int KEY_STATE_PRESSED = 0;
     public static final int KEY_STATE_RELEASED = 1;
 
-    public static final String ACTION_TRACK_EVENT =
-             "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
-    public static final String EXTRA_PLAYBACK =
-            "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
-
-
-
     static BrowseTree sBrowseTree;
     private static AvrcpControllerService sService;
     private final BluetoothAdapter mAdapter;
@@ -130,7 +123,6 @@ public class AvrcpControllerService extends ProfileService {
         Intent stopIntent = new Intent(this, BluetoothMediaBrowserService.class);
         stopService(stopIntent);
         for (AvrcpControllerStateMachine stateMachine : mDeviceStateMap.values()) {
-            stateMachine.doQuit();
             stateMachine.quitNow();
         }
 
@@ -311,12 +303,8 @@ public class AvrcpControllerService extends ProfileService {
     }
 
     // Called by JNI to notify Avrcp of features supported by the Remote device.
-    private void getRcFeatures(byte[] address, int features, int caPsm) {
-        /*Log.i(TAG, " getRcFeatures caPsm :" + caPsm);
-        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-        Message msg = mAvrcpCtSm.obtainMessage(
-            AvrcpControllerStateMachine.MESSAGE_PROCESS_RC_FEATURES, features, caPsm, device);
-        mAvrcpCtSm.sendMessage(msg); */
+    private void getRcFeatures(byte[] address, int features) {
+        /* Do Nothing. */
     }
 
     // Called by JNI
@@ -346,7 +334,7 @@ public class AvrcpControllerService extends ProfileService {
         AvrcpControllerStateMachine stateMachine = getStateMachine(device);
         if (stateMachine != null) {
             stateMachine.sendMessage(AvrcpControllerStateMachine.MESSAGE_PROCESS_SET_ABS_VOL_CMD,
-                    absVol, label);
+                    absVol);
         }
     }
 
@@ -363,13 +351,7 @@ public class AvrcpControllerService extends ProfileService {
             stateMachine.sendMessage(AvrcpControllerStateMachine.MESSAGE_PROCESS_TRACK_CHANGED,
                     TrackInfo.getMetadata(attributes, attribVals));
         }
-
     }
-
-     private void onElementAttributeUpdate(byte[] address, byte numAttributes, int[] attributes,
-            String[] attribVals) {
-
-     }
 
     // Called by JNI periodically based upon timer to update play position
     private synchronized void onPlayPositionChanged(byte[] address, int songLen,
@@ -659,7 +641,10 @@ public class AvrcpControllerService extends ProfileService {
         return true;
     }
 
-    void removeStateMachine(AvrcpControllerStateMachine stateMachine) {
+    /**
+     * Remove state machine from device map once it is no longer needed.
+     */
+    public void removeStateMachine(AvrcpControllerStateMachine stateMachine) {
         mDeviceStateMap.remove(stateMachine.getDevice());
     }
 
@@ -706,15 +691,6 @@ public class AvrcpControllerService extends ProfileService {
                 : stateMachine.getState();
     }
 
-    public void onDeviceUpdated(BluetoothDevice device) {
-        AvrcpControllerStateMachine stateMachine = mDeviceStateMap.get(device);
-        if (stateMachine != null) {
-            Log.d(TAG, "Send device: " + device + " updated meassage to Avrcpstatemachine");
-            stateMachine.sendMessage(AvrcpControllerStateMachine.MSG_DEVICE_UPDATED,
-                    device);
-        }
-    }
-
     @Override
     public void dump(StringBuilder sb) {
         super.dump(sb);
@@ -742,7 +718,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param keyState 0 = key pressed, 1 = key released
      * @return command was sent
      */
-    public native static boolean sendPassThroughCommandNative(byte[] address, int keyCode, int keyState);
+    public native boolean sendPassThroughCommandNative(byte[] address, int keyCode, int keyState);
 
     /**
      * Send group navigation commands
@@ -751,7 +727,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param keyState state
      * @return command was sent
      */
-    public native static boolean sendGroupNavigationCommandNative(byte[] address, int keyCode,
+    public native boolean sendGroupNavigationCommandNative(byte[] address, int keyCode,
             int keyState);
 
     /**
@@ -761,7 +737,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param attribIds list of settings to be changed
      * @param attribVal list of settings values
      */
-    public native static void setPlayerApplicationSettingValuesNative(byte[] address, byte numAttrib,
+    public native void setPlayerApplicationSettingValuesNative(byte[] address, byte numAttrib,
             byte[] attribIds, byte[] attribVal);
 
     /**
@@ -770,7 +746,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param absVol new volume
      * @param label  label
      */
-    public native static void sendAbsVolRspNative(byte[] address, int absVol, int label);
+    public native void sendAbsVolRspNative(byte[] address, int absVol, int label);
 
     /**
      * Register for any volume level changes
@@ -779,13 +755,13 @@ public class AvrcpControllerService extends ProfileService {
      * @param absVol  current volume
      * @param label   label
      */
-    public native static void sendRegisterAbsVolRspNative(byte[] address, byte rspType, int absVol,
+    public native void sendRegisterAbsVolRspNative(byte[] address, byte rspType, int absVol,
             int label);
 
     /**
      * Fetch the playback state
      */
-    public native static void getPlaybackStateNative(byte[] address);
+    public native void getPlaybackStateNative(byte[] address);
 
     /**
      * Fetch the current now playing list
@@ -793,7 +769,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param start first index to retrieve
      * @param end   last index to retrieve
      */
-    public native static void getNowPlayingListNative(byte[] address, int start, int end);
+    public native void getNowPlayingListNative(byte[] address, int start, int end);
 
     /**
      * Fetch the current folder's listing
@@ -801,7 +777,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param start first index to retrieve
      * @param end   last index to retrieve
      */
-    public native static void getFolderListNative(byte[] address, int start, int end);
+    public native void getFolderListNative(byte[] address, int start, int end);
 
     /**
      * Fetch the listing of players
@@ -809,7 +785,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param start first index to retrieve
      * @param end   last index to retrieve
      */
-    public native static void getPlayerListNative(byte[] address, int start, int end);
+    public native void getPlayerListNative(byte[] address, int start, int end);
 
     /**
      * Change the current browsed folder
@@ -817,7 +793,7 @@ public class AvrcpControllerService extends ProfileService {
      * @param direction up/down
      * @param uid       folder unique id
      */
-    public native static void changeFolderPathNative(byte[] address, byte direction, long uid);
+    public native void changeFolderPathNative(byte[] address, byte direction, long uid);
 
     /**
      * Play item with provided uid
@@ -826,23 +802,19 @@ public class AvrcpControllerService extends ProfileService {
      * @param uid        song unique id
      * @param uidCounter counter
      */
-    public native static void playItemNative(byte[] address, byte scope, long uid, int uidCounter);
+    public native void playItemNative(byte[] address, byte scope, long uid, int uidCounter);
 
     /**
      * Set a specific player for browsing
      *
      * @param playerId player number
      */
-    public native static void setBrowsedPlayerNative(byte[] address, int playerId);
+    public native void setBrowsedPlayerNative(byte[] address, int playerId);
 
     /**
      * Set a specific player for handling playback commands
      *
      * @param playerId player number
      */
-    public native static void setAddressedPlayerNative(byte[] address, int playerId);
-
-    /* This api is used to fetch ElementAttributes */
-    native static void getElementAttributesNative(byte[] address, byte numAttributes,
-                                                   byte[] attribIds);
+    public native void setAddressedPlayerNative(byte[] address, int playerId);
 }
