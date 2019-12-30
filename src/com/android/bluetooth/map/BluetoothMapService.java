@@ -36,6 +36,7 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.PowerManager;
 import android.os.RemoteException;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
@@ -585,18 +586,18 @@ public class BluetoothMapService extends ProfileService {
         }
     }
 
-    boolean setPriority(BluetoothDevice device, int priority) {
+    boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
         if (VERBOSE) {
-            Log.v(TAG, "Saved priority " + device + " = " + priority);
+            Log.v(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
         }
         AdapterService.getAdapterService().getDatabase()
-                .setProfilePriority(device, BluetoothProfile.MAP, priority);
+                .setProfileConnectionPolicy(device, BluetoothProfile.MAP, connectionPolicy);
         return true;
     }
 
-    int getPriority(BluetoothDevice device) {
+    int getConnectionPolicy(BluetoothDevice device) {
         return AdapterService.getAdapterService().getDatabase()
-                .getProfilePriority(device, BluetoothProfile.MAP);
+                .getProfileConnectionPolicy(device, BluetoothProfile.MAP);
     }
 
     @Override
@@ -637,7 +638,8 @@ public class BluetoothMapService extends ProfileService {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mAppObserver = new BluetoothMapAppObserver(this, this);
 
-        mSmsCapable = getResources().getBoolean(com.android.internal.R.bool.config_sms_capable);
+        TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        mSmsCapable = tm.isSmsCapable();
 
         mEnabledAccounts = mAppObserver.getEnabledAccountItems();
         createMasInstances();  // Uses mEnabledAccounts
@@ -1258,21 +1260,21 @@ public class BluetoothMapService extends ProfileService {
         }
 
         @Override
-        public boolean setPriority(BluetoothDevice device, int priority) {
+        public boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
             BluetoothMapService service = getService();
             if (service == null) {
                 return false;
             }
-            return service.setPriority(device, priority);
+            return service.setConnectionPolicy(device, connectionPolicy);
         }
 
         @Override
-        public int getPriority(BluetoothDevice device) {
+        public int getConnectionPolicy(BluetoothDevice device) {
             BluetoothMapService service = getService();
             if (service == null) {
-                return BluetoothProfile.PRIORITY_UNDEFINED;
+                return BluetoothProfile.CONNECTION_POLICY_UNKNOWN;
             }
-            return service.getPriority(device);
+            return service.getConnectionPolicy(device);
         }
     }
 
