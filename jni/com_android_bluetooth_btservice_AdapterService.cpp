@@ -71,8 +71,8 @@ static JNIEnv* callbackEnv = NULL;
 static pthread_t sCallbackThread;
 static bool sHaveCallbackThread;
 
-static jobject sJniAdapterServiceObj = NULL;
-static jobject sJniCallbacksObj = NULL;
+static jobject sJniAdapterServiceObj;
+static jobject sJniCallbacksObj;
 static jfieldID sJniCallbacksField;
 
 const bt_interface_t* getBluetoothInterface() { return sBluetoothInterface; }
@@ -507,12 +507,10 @@ class JNIThreadAttacher {
   jint status_;
 };
 
-#ifdef ENABLE_JAVA_WAKE_LOCKS
 static bool set_wake_alarm_callout(uint64_t delay_millis, bool should_wake,
                                    alarm_cb cb, void* data) {
   JNIThreadAttacher attacher(vm);
   JNIEnv* env = attacher.getEnv();
-  jboolean ret = JNI_FALSE;
 
   if (env == nullptr) {
     ALOGE("%s: Unable to get JNI Env", __func__);
@@ -523,15 +521,10 @@ static bool set_wake_alarm_callout(uint64_t delay_millis, bool should_wake,
   sAlarmCallbackData = data;
 
   jboolean jshould_wake = should_wake ? JNI_TRUE : JNI_FALSE;
-  if (sJniAdapterServiceObj) {
-      ret = env->CallBooleanMethod(sJniAdapterServiceObj, method_setWakeAlarm,
+  jboolean ret =
+      env->CallBooleanMethod(sJniAdapterServiceObj, method_setWakeAlarm,
                              (jlong)delay_millis, jshould_wake);
-  } else {
-       ALOGE("%s JNI ERROR : JNI reference already cleaned : set_wake_alarm_callout", __func__);
-  }
-
   if (!ret) {
-    ALOGE("%s setWakeAlarm failed:ret= %d ", __func__, ret);
     sAlarmCallback = NULL;
     sAlarmCallbackData = NULL;
   }
@@ -552,13 +545,9 @@ static int acquire_wake_lock_callout(const char* lock_name) {
   {
     ScopedLocalRef<jstring> lock_name_jni(env, env->NewStringUTF(lock_name));
     if (lock_name_jni.get()) {
-        if (sJniAdapterServiceObj) {
-            bool acquired = env->CallBooleanMethod(
-              sJniAdapterServiceObj, method_acquireWakeLock, lock_name_jni.get());
-            if (!acquired) ret = BT_STATUS_WAKELOCK_ERROR;
-        } else {
-          ALOGE("%s JNI ERROR : JNI reference already cleaned : acquire_wake_lock_callout", __func__);
-        }
+      bool acquired = env->CallBooleanMethod(
+          sJniAdapterServiceObj, method_acquireWakeLock, lock_name_jni.get());
+      if (!acquired) ret = BT_STATUS_WAKELOCK_ERROR;
     } else {
       ALOGE("%s unable to allocate string: %s", __func__, lock_name);
       ret = BT_STATUS_NOMEM;
@@ -581,13 +570,9 @@ static int release_wake_lock_callout(const char* lock_name) {
   {
     ScopedLocalRef<jstring> lock_name_jni(env, env->NewStringUTF(lock_name));
     if (lock_name_jni.get()) {
-        if (sJniAdapterServiceObj) {
-            bool released = env->CallBooleanMethod(
-               sJniAdapterServiceObj, method_releaseWakeLock, lock_name_jni.get());
-            if (!released) ret = BT_STATUS_WAKELOCK_ERROR;
-         } else {
-          ALOGE("%s JNI ERROR : JNI reference already cleaned : release_wake_lock_callout", __func__);
-        }
+      bool released = env->CallBooleanMethod(
+          sJniAdapterServiceObj, method_releaseWakeLock, lock_name_jni.get());
+      if (!released) ret = BT_STATUS_WAKELOCK_ERROR;
     } else {
       ALOGE("%s unable to allocate string: %s", __func__, lock_name);
       ret = BT_STATUS_NOMEM;
@@ -596,7 +581,7 @@ static int release_wake_lock_callout(const char* lock_name) {
 
   return ret;
 }
-#endif
+
 // Called by Java code when alarm is fired. A wake lock is held by the caller
 // over the duration of this callback.
 static void alarmFiredNative(JNIEnv* env, jobject obj) {
@@ -606,12 +591,11 @@ static void alarmFiredNative(JNIEnv* env, jobject obj) {
     ALOGE("%s() - Alarm fired with callback not set!", __func__);
   }
 }
-#ifdef ENABLE_JAVA_WAKE_LOCKS
+
 static bt_os_callouts_t sBluetoothOsCallouts = {
     sizeof(sBluetoothOsCallouts), set_wake_alarm_callout,
     acquire_wake_lock_callout, release_wake_lock_callout,
 };
-#endif
 
 int hal_util_load_bt_library(const bt_interface_t** interface) {
   const char* sym = BLUETOOTH_INTERFACE_STRING;
@@ -713,14 +697,11 @@ static bool initNative(JNIEnv* env, jobject obj, jboolean isGuest,
   int ret = sBluetoothInterface->init(&sBluetoothCallbacks,
                                       isGuest == JNI_TRUE ? 1 : 0,
                                       isSingleUserMode == JNI_TRUE ? 1 : 0);
-  if (ret != BT_STATUS_SUCCESS && ret != BT_STATUS_DONE) {
+  if (ret != BT_STATUS_SUCCESS) {
     ALOGE("Error while setting the callbacks: %d\n", ret);
     sBluetoothInterface = NULL;
     return JNI_FALSE;
   }
-
-  /*disable these os_callout settings, so that native wake_lock will be enabled*/
-#ifdef ENABLE_JAVA_WAKE_LOCKS
   ret = sBluetoothInterface->set_os_callouts(&sBluetoothOsCallouts);
   if (ret != BT_STATUS_SUCCESS) {
     ALOGE("Error while setting Bluetooth callouts: %d\n", ret);
@@ -728,7 +709,6 @@ static bool initNative(JNIEnv* env, jobject obj, jboolean isGuest,
     sBluetoothInterface = NULL;
     return JNI_FALSE;
   }
-#endif
 
   sBluetoothSocketInterface =
       (btsock_interface_t*)sBluetoothInterface->get_profile_interface(
@@ -1157,11 +1137,6 @@ static void dumpNative(JNIEnv* env, jobject obj, jobject fdObj,
   const char** args = nullptr;
   if (numArgs > 0) args = new const char*[numArgs];
 
-  if (!args || !argObjs) {
-    ALOGE("%s: not have enough memeory", __func__);
-    return;
-  }
-
   for (int i = 0; i < numArgs; i++) {
     argObjs[i] = (jstring)env->GetObjectArrayElement(argArray, i);
     args[i] = env->GetStringUTFChars(argObjs[i], NULL);
@@ -1367,17 +1342,17 @@ int register_com_android_bluetooth_btservice_AdapterService(JNIEnv* env) {
 /*
  * JNI Initialization
  */
-jint JNI_OnLoad(JavaVM *jvm, void *reserved) {
-    JNIEnv *e;
-    int status;
+jint JNI_OnLoad(JavaVM* jvm, void* reserved) {
+  JNIEnv* e;
+  int status;
 
-    ALOGV("Bluetooth Adapter Service : loading JNI\n");
+  ALOGV("Bluetooth Adapter Service : loading JNI\n");
 
-    // Check JNI version
-    if (jvm->GetEnv((void **)&e, JNI_VERSION_1_6)) {
-        ALOGE("JNI version mismatch error");
-        return JNI_ERR;
-    }
+  // Check JNI version
+  if (jvm->GetEnv((void**)&e, JNI_VERSION_1_6)) {
+    ALOGE("JNI version mismatch error");
+    return JNI_ERR;
+  }
 
   status = android::register_com_android_bluetooth_btservice_AdapterService(e);
   if (status < 0) {
@@ -1388,12 +1363,6 @@ jint JNI_OnLoad(JavaVM *jvm, void *reserved) {
   status = android::register_com_android_bluetooth_hfp(e);
   if (status < 0) {
     ALOGE("jni hfp registration failure, status: %d", status);
-    return JNI_ERR;
-  }
-
-  status = android::register_com_android_bluetooth_hfp_vendorhfservice(e);
-  if (status < 0) {
-    ALOGE("jni vendor hfp service registration failure, status: %d", status);
     return JNI_ERR;
   }
 
@@ -1409,21 +1378,9 @@ jint JNI_OnLoad(JavaVM *jvm, void *reserved) {
     return JNI_ERR;
   }
 
-  status = android::register_com_android_bluetooth_ba(e);
-  if (status < 0) {
-      ALOGE("jni BA Transmitter registration failure: %d", status);
-      return JNI_ERR;
-  }
-
   status = android::register_com_android_bluetooth_a2dp_sink(e);
   if (status < 0) {
     ALOGE("jni a2dp sink registration failure: %d", status);
-    return JNI_ERR;
-  }
-
-  status = android::register_com_android_bluetooth_avrcp(e);
-  if (status < 0) {
-    ALOGE("jni avrcp target registration failure: %d", status);
     return JNI_ERR;
   }
 
@@ -1468,27 +1425,9 @@ jint JNI_OnLoad(JavaVM *jvm, void *reserved) {
     return JNI_ERR;
   }
 
-  status = android::register_com_android_bluetooth_btservice_vendor(e);
-  if (status < 0) {
-    ALOGE("jni vendor registration failure: %d", status);
-    return JNI_ERR;
-  }
-
-  status = android::register_com_android_bluetooth_btservice_vendor_socket(e);
-  if (status < 0) {
-    ALOGE("jni vendor socket registration failure: %d", status);
-    return JNI_ERR;
-  }
-
   status = android::register_com_android_bluetooth_hearing_aid(e);
   if (status < 0) {
     ALOGE("jni hearing aid registration failure: %d", status);
-    return JNI_ERR;
-  }
-
-  status = android::register_com_android_bluetooth_avrcp_ext(e);
-  if (status < 0) {
-    ALOGE("jni avrcp_ext registration failure: %d", status);
     return JNI_ERR;
   }
 

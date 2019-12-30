@@ -259,8 +259,7 @@ static std::vector<btav_a2dp_codec_config_t> prepareCodecPreferences(
 
 static void initNative(JNIEnv* env, jobject object,
                        jint maxConnectedAudioDevices,
-                       jobjectArray codecConfigArray,
-                       jobjectArray codecConfigOffload) {
+                       jobjectArray codecConfigArray) {
   std::unique_lock<std::shared_timed_mutex> interface_lock(interface_mutex);
   std::unique_lock<std::shared_timed_mutex> callbacks_lock(callbacks_mutex);
 
@@ -306,10 +305,9 @@ static void initNative(JNIEnv* env, jobject object,
   std::vector<btav_a2dp_codec_config_t> codec_priorities =
       prepareCodecPreferences(env, object, codecConfigArray);
 
-  std::vector<btav_a2dp_codec_config_t> offload_codec_supported =
-      prepareCodecPreferences(env, object, codecConfigOffload);
+  // TODO(b/140404592): Fix this call to sBluetoothA2dpInterface->init()
   bt_status_t status = sBluetoothA2dpInterface->init(
-      &sBluetoothA2dpCallbacks, maxConnectedAudioDevices, codec_priorities, offload_codec_supported);
+      &sBluetoothA2dpCallbacks, maxConnectedAudioDevices, codec_priorities, {});
   if (status != BT_STATUS_SUCCESS) {
     ALOGE("%s: Failed to initialize Bluetooth A2DP, status: %d", __func__,
           status);
@@ -434,6 +432,9 @@ static jboolean setActiveDeviceNative(JNIEnv* env, jobject object,
   if (addr) {
     bd_addr.FromOctets(reinterpret_cast<const uint8_t*>(addr));
   }
+  if (bd_addr == RawAddress::kEmpty) {
+    return JNI_FALSE;
+  }
   bt_status_t status = sBluetoothA2dpInterface->set_active_device(bd_addr);
   if (status != BT_STATUS_SUCCESS) {
     ALOGE("%s: Failed A2DP set_active_device, status: %d", __func__, status);
@@ -474,7 +475,7 @@ static jboolean setCodecConfigPreferenceNative(JNIEnv* env, jobject object,
 
 static JNINativeMethod sMethods[] = {
     {"classInitNative", "()V", (void*)classInitNative},
-    {"initNative", "(I[Landroid/bluetooth/BluetoothCodecConfig;[Landroid/bluetooth/BluetoothCodecConfig;)V",
+    {"initNative", "(I[Landroid/bluetooth/BluetoothCodecConfig;)V",
      (void*)initNative},
     {"cleanupNative", "()V", (void*)cleanupNative},
     {"connectA2dpNative", "([B)Z", (void*)connectA2dpNative},

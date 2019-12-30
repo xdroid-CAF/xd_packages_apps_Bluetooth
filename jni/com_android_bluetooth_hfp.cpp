@@ -182,7 +182,7 @@ class JniHeadsetCallbacks : bluetooth::headset::Callbacks {
     }
 
     char null_str[] = "";
-    if (number != nullptr && !sCallbackEnv.isValidUtf(number)) {
+    if (!sCallbackEnv.isValidUtf(number)) {
       android_errorWriteLog(0x534e4554, "109838537");
       ALOGE("%s: number is not a valid UTF string.", __func__);
       number = null_str;

@@ -342,6 +342,8 @@ class PbapStateMachine extends StateMachine {
             }
             BluetoothObexTransport transport = new BluetoothObexTransport(mConnSocket);
             mServerSession = new ServerSession(transport, mPbapServer, mObexAuth);
+            // It's ok to just use one wake lock
+            // Message MSG_ACQUIRE_WAKE_LOCK is always surrounded by RELEASE. safe.
         }
 
         private void stopObexServerSession() {
@@ -390,11 +392,9 @@ class PbapStateMachine extends StateMachine {
                             .setFlag(Notification.FLAG_AUTO_CANCEL, true)
                             .setFlag(Notification.FLAG_ONLY_ALERT_ONCE, true)
                             .setContentIntent(
-                                    PendingIntent.getActivity(mService, 0, clickIntent,
-                                    PendingIntent.FLAG_UPDATE_CURRENT))
+                                    PendingIntent.getActivity(mService, 0, clickIntent, 0))
                             .setDeleteIntent(
-                                    PendingIntent.getBroadcast(mService, 0, deleteIntent,
-                                    PendingIntent.FLAG_UPDATE_CURRENT))
+                                    PendingIntent.getBroadcast(mService, 0, deleteIntent, 0))
                             .setLocalOnly(true)
                             .build();
             nm.notify(mNotificationId, notification);

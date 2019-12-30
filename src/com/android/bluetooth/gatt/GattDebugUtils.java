@@ -73,10 +73,6 @@ import java.util.UUID;
             return false;
         }
 
-        if (intent == null) {
-            Log.d(TAG, "received NULL intent in GattService. Return.");
-            return true;
-        }
         String action = intent.getAction();
         Log.d(TAG, "handleDebugAction() action=" + action);
 

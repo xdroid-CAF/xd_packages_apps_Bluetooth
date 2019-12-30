@@ -24,7 +24,6 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED" />
-    <uses-permission android:name="android.permission.LOCAL_MAC_ADDRESS" />
     <uses-permission android:name="android.permission.BLUETOOTH_MAP" />
     <uses-permission android:name="android.permission.DUMP" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -66,16 +65,6 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
     <uses-permission android:name="android.permission.UPDATE_DEVICE_STATS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
-    <uses-permission android:name="com.android.email.permission.ACCESS_PROVIDER"/>
-    <uses-permission android:name="com.android.email.permission.READ_ATTACHMENT"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.OVERRIDE_WIFI_CONFIG" />
-
-    <!-- Allows application to write to internal media storage -->
-    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE" />
 
     <uses-sdk android:minSdkVersion="14"/>
 
@@ -352,14 +341,6 @@
             android:enabled="@bool/profile_supported_avrcp_controller">
             <intent-filter>
                 <action android:name="android.bluetooth.IBluetoothAvrcpController" />
-            </intent-filter>
-        </service>
-        <service
-            android:process="@string/process"
-            android:name = ".ba.BATService"
-            android:enabled="@bool/profile_supported_ba">
-            <intent-filter>
-                <action android:name="android.bluetooth.IBluetoothBATransmitter" />
             </intent-filter>
         </service>
         <service

@@ -21,7 +21,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.os.Handler;
 import android.preference.PreferenceManager;
@@ -200,8 +199,7 @@ class BluetoothPbapUtils {
         }
     }
 
-    static void loadAllContacts(Context context, Handler handler)
-            throws IllegalStateException, SQLiteException {
+    static void loadAllContacts(Context context, Handler handler) {
         if (V) {
             Log.v(TAG, "Loading Contacts ...");
         }
@@ -215,8 +213,7 @@ class BluetoothPbapUtils {
         handler.sendMessage(handler.obtainMessage(BluetoothPbapService.CONTACTS_LOADED));
     }
 
-    static void updateSecondaryVersionCounter(Context context, Handler handler)
-            throws IllegalStateException, SQLiteException {
+    static void updateSecondaryVersionCounter(Context context, Handler handler) {
             /* updatedList stores list of contacts which are added/updated after
              * the time when contacts were last updated. (contactsLastUpdated
              * indicates the time when contact/contacts were last updated and
@@ -232,15 +229,9 @@ class BluetoothPbapUtils {
             Log.d(TAG, "Failed to fetch data from contact database");
             return;
         }
-        int indexCid = c.getColumnIndex(Contacts._ID);
-        int indexTimestamp = c.getColumnIndex(Contacts.CONTACT_LAST_UPDATED_TIMESTAMP);
         while (c.moveToNext()) {
-            if (c.isNull(indexCid)) {
-                Log.d(TAG, "Skipping unavailable contact from cursor.");
-                continue;
-            }
-            String contactId = c.getString(indexCid);
-            long lastUpdatedTime = c.getLong(indexTimestamp);
+            String contactId = c.getString(0);
+            long lastUpdatedTime = c.getLong(1);
             if (lastUpdatedTime > sContactsLastUpdated) {
                 updatedList.add(contactId);
             }
@@ -439,10 +430,6 @@ class BluetoothPbapUtils {
         int indexMimeType = c.getColumnIndex(Data.MIMETYPE);
         String contactId, data, mimeType;
         while (c.moveToNext()) {
-            if (c.isNull(indexCId) || c.isNull(indexMimeType)) {
-                Log.e(TAG, "Contact data in cursor is not found. Skipping.");
-                continue;
-            }
             contactId = c.getString(indexCId);
             data = c.getString(indexData);
             mimeType = c.getString(indexMimeType);

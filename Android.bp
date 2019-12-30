@@ -19,10 +19,8 @@ cc_library_shared {
     header_libs: ["libbluetooth_headers"],
     include_dirs: [
         "system/bt/types",
-        "vendor/qcom/opensource/commonsys/bluetooth_ext/vhal/include",
     ],
     shared_libs: [
-        "libandroid_runtime",
         "libbase",
         "libchrome",
         "libnativehelper",
@@ -30,8 +28,6 @@ cc_library_shared {
     ],
     static_libs: [
         "libbluetooth-types",
-        "libcutils",
-        "libbluetoothqti_jni",
     ],
     cflags: [
         "-Wall",
@@ -49,10 +45,7 @@ cc_library_shared {
 android_app {
     name: "Bluetooth",
 
-    srcs: [
-        "src/**/*.java",
-        ":vendor_qcom_opensource_commonsys_bluetooth_ext_packages_apps_bluetooth_ext",
-    ],
+    srcs: ["src/**/*.java"],
     platform_apis: true,
     certificate: "platform",
 
@@ -85,9 +78,5 @@ android_app {
     optimize: {
         enabled: false,
     },
-    required: ["libbluetooth"],
-
-    proto: {
-        type: "micro",
-    },
+    required: ["libbluetooth"]
 }

@@ -23,10 +23,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.CallLog.Calls;
-import android.provider.ContactsContract.CommonDataKinds;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.PhoneLookup;
-import android.provider.ContactsContract.Contacts;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
 
@@ -64,27 +62,9 @@ public class AtPhonebook {
      *  BT periphals don't. Limit the number we'll report. */
     private static final int MAX_PHONEBOOK_SIZE = 16384;
 
-    private final String SIM_URI = "content://icc/adn";
-
-    static final String[] SIM_PROJECTION = new String[] {
-            Contacts.DISPLAY_NAME,
-            CommonDataKinds.Phone.NUMBER,
-            CommonDataKinds.Phone.TYPE,
-            CommonDataKinds.Phone.LABEL
-    };
-
-    private static final int NAME_COLUMN_INDEX = 0;
-    private static final int NUMBER_COLUMN_INDEX = 1;
-    private static final int NUMBERTYPE_COLUMN_INDEX = 2;
-
     private static final String OUTGOING_CALL_WHERE = Calls.TYPE + "=" + Calls.OUTGOING_TYPE;
     private static final String INCOMING_CALL_WHERE = Calls.TYPE + "=" + Calls.INCOMING_TYPE;
     private static final String MISSED_CALL_WHERE = Calls.TYPE + "=" + Calls.MISSED_TYPE;
-    private static final String VISIBLE_PHONEBOOK_WHERE = null;
-    private static final String VISIBLE_SIM_PHONEBOOK_WHERE = null;
-
-    public static final int OUTGOING_IMS_TYPE = 1001;
-    public static final int OUTGOING_WIFI_TYPE = 1004;
 
     private class PhonebookResult {
         public Cursor cursor; // result set of last query
@@ -108,7 +88,7 @@ public class AtPhonebook {
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
 
     private final HashMap<String, PhonebookResult> mPhonebooks =
-            new HashMap<String, PhonebookResult>(5);
+            new HashMap<String, PhonebookResult>(4);
 
     static final int TYPE_UNKNOWN = -1;
     static final int TYPE_READ = 0;
@@ -124,8 +104,6 @@ public class AtPhonebook {
         mPhonebooks.put("RC", new PhonebookResult());  // received calls
         mPhonebooks.put("MC", new PhonebookResult());  // missed calls
         mPhonebooks.put("ME", new PhonebookResult());  // mobile phonebook
-        mPhonebooks.put("SM", new PhonebookResult());  // SIM phonebook
-
         mCurrentPhonebook = "ME";  // default to mobile phonebook
         mCpbrIndex1 = mCpbrIndex2 = -1;
     }
@@ -137,32 +115,24 @@ public class AtPhonebook {
     /** Returns the last dialled number, or null if no numbers have been called */
     public String getLastDialledNumber() {
         String[] projection = {Calls.NUMBER};
-        try {
-            Cursor cursor = mContentResolver.query(Calls.CONTENT_URI, projection,
-                    Calls.TYPE + " = " + Calls.OUTGOING_TYPE + " OR " + Calls.TYPE +
-                    " = " + OUTGOING_IMS_TYPE + " OR " + Calls.TYPE + " = " +
-                    OUTGOING_WIFI_TYPE, null, Calls.DEFAULT_SORT_ORDER +
-                    " LIMIT 1");
-            log("Queried the last dialled number for CS, IMS, WIFI calls");
-            if (cursor == null) {
-                Log.w(TAG, "getLastDialledNumber, cursor is null");
-                return null;
-            }
-
-            if (cursor.getCount() < 1) {
-                cursor.close();
-                Log.w(TAG, "getLastDialledNumber, cursor.getCount is 0");
-                return null;
-            }
-            cursor.moveToNext();
-            int column = cursor.getColumnIndexOrThrow(Calls.NUMBER);
-            String number = cursor.getString(column);
-            cursor.close();
-            return number;
-        } catch (Exception e) {
-            Log.e(TAG, "Exception while querying last dialled number", e);
+        Cursor cursor = mContentResolver.query(Calls.CONTENT_URI, projection,
+                Calls.TYPE + "=" + Calls.OUTGOING_TYPE, null,
+                Calls.DEFAULT_SORT_ORDER + " LIMIT 1");
+        if (cursor == null) {
+            Log.w(TAG, "getLastDialledNumber, cursor is null");
+            return null;
         }
-        return null;
+
+        if (cursor.getCount() < 1) {
+            cursor.close();
+            Log.w(TAG, "getLastDialledNumber, cursor.getCount is 0");
+            return null;
+        }
+        cursor.moveToNext();
+        int column = cursor.getColumnIndexOrThrow(Calls.NUMBER);
+        String number = cursor.getString(column);
+        cursor.close();
+        return number;
     }
 
     public boolean getCheckingAccessPermission() {
@@ -236,6 +206,11 @@ public class AtPhonebook {
             case TYPE_READ: // Read
                 log("handleCpbsCommand - read command");
                 // Return current size and max size
+                if ("SM".equals(mCurrentPhonebook)) {
+                    atCommandResponse = "+CPBS: \"SM\",0," + getMaxPhoneBookSize(0);
+                    atCommandResult = HeadsetHalConstants.AT_RESPONSE_OK;
+                    break;
+                }
                 PhonebookResult pbr = getPhonebookResult(mCurrentPhonebook, true);
                 if (pbr == null) {
                     atCommandErrorCode = BluetoothCmeError.OPERATION_NOT_SUPPORTED;
@@ -304,17 +279,21 @@ public class AtPhonebook {
                  */
                 log("handleCpbrCommand - test command");
                 int size;
-                PhonebookResult pbr = getPhonebookResult(mCurrentPhonebook, true); //false);
-                if (pbr == null) {
-                    atCommandErrorCode = BluetoothCmeError.OPERATION_NOT_ALLOWED;
-                    mNativeInterface.atResponseCode(remoteDevice, atCommandResult,
-                            atCommandErrorCode);
-                    break;
+                if ("SM".equals(mCurrentPhonebook)) {
+                    size = 0;
+                } else {
+                    PhonebookResult pbr = getPhonebookResult(mCurrentPhonebook, true); //false);
+                    if (pbr == null) {
+                        atCommandErrorCode = BluetoothCmeError.OPERATION_NOT_ALLOWED;
+                        mNativeInterface.atResponseCode(remoteDevice, atCommandResult,
+                                atCommandErrorCode);
+                        break;
+                    }
+                    size = pbr.cursor.getCount();
+                    log("handleCpbrCommand - size = " + size);
+                    pbr.cursor.close();
+                    pbr.cursor = null;
                 }
-                size = pbr.cursor.getCount();
-                log("handleCpbrCommand - size = "+size);
-                pbr.cursor.close();
-                pbr.cursor = null;
                 if (size == 0) {
                     /* Sending "+CPBR: (1-0)" can confused some carkits, send "1-1" * instead */
                     size = 1;
@@ -331,7 +310,6 @@ public class AtPhonebook {
                 // AT+CPBR=<index1>[,<index2>]
                 log("handleCpbrCommand - set/read command");
                 if (mCpbrIndex1 != -1) {
-                   Log.i(TAG, "mCpbrIndex1 :" + mCpbrIndex1);
                    /* handling a CPBR at the moment, reject this CPBR command */
                     atCommandErrorCode = BluetoothCmeError.OPERATION_NOT_ALLOWED;
                     mNativeInterface.atResponseCode(remoteDevice, atCommandResult,
@@ -371,9 +349,7 @@ public class AtPhonebook {
                 mCheckingAccessPermission = true;
 
                 int permission = checkAccessPermission(remoteDevice);
-                Log.i(TAG, "permission :" + permission);
                 if (permission == BluetoothDevice.ACCESS_ALLOWED) {
-                    Log.i(TAG, "permission to access is granted:" );
                     mCheckingAccessPermission = false;
                     atCommandResult = processCpbrCommand(remoteDevice);
                     mCpbrIndex1 = mCpbrIndex2 = -1;
@@ -381,7 +357,6 @@ public class AtPhonebook {
                             atCommandErrorCode);
                     break;
                 } else if (permission == BluetoothDevice.ACCESS_REJECTED) {
-                    Log.i(TAG, "permission to access is not granted:" );
                     mCheckingAccessPermission = false;
                     mCpbrIndex1 = mCpbrIndex2 = -1;
                     mNativeInterface.atResponseCode(remoteDevice,
@@ -425,7 +400,6 @@ public class AtPhonebook {
     private synchronized boolean queryPhonebook(String pb, PhonebookResult pbr) {
         String where;
         boolean ancillaryPhonebook = true;
-        boolean simPhonebook = false;
 
         if (pb.equals("ME")) {
             ancillaryPhonebook = false;
@@ -436,10 +410,6 @@ public class AtPhonebook {
             where = INCOMING_CALL_WHERE;
         } else if (pb.equals("MC")) {
             where = MISSED_CALL_WHERE;
-        } else if (pb.equals("SM")) {
-            ancillaryPhonebook = false;
-            simPhonebook = true;
-            where = VISIBLE_SIM_PHONEBOOK_WHERE;
         } else {
             return false;
         }
@@ -450,14 +420,9 @@ public class AtPhonebook {
         }
 
         if (ancillaryPhonebook) {
-            try {
-                pbr.cursor = mContentResolver.query(Calls.CONTENT_URI, CALLS_PROJECTION, where,
-                          null, Calls.DEFAULT_SORT_ORDER + " LIMIT " + MAX_PHONEBOOK_SIZE);
-                if (pbr.cursor == null) {
-                    return false;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Exception while querying the call log database", e);
+            pbr.cursor = mContentResolver.query(Calls.CONTENT_URI, CALLS_PROJECTION, where, null,
+                    Calls.DEFAULT_SORT_ORDER + " LIMIT " + MAX_PHONEBOOK_SIZE);
+            if (pbr.cursor == null) {
                 return false;
             }
 
@@ -467,56 +432,17 @@ public class AtPhonebook {
             pbr.typeColumn = -1;
             pbr.nameColumn = -1;
         } else {
-            Log.i(TAG, "simPhonebook " + simPhonebook);
-            if (simPhonebook) {
-                final Uri mysimUri = Uri.parse(SIM_URI);
-                try {
-                    pbr.cursor = mContentResolver.query(mysimUri, SIM_PROJECTION,
-                            where, null, null);
-                    Log.i(TAG, "querySIMcontactbook where " + where + " uri :" + mysimUri);
-                    if (pbr.cursor == null) {
-                        Log.i(TAG, "querying phone contacts on sim returned null.");
-                        return false;
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Exception while querying sim contact book database", e);
-                    return false;
-                }
-
-                pbr.numberColumn = NUMBER_COLUMN_INDEX;
-                pbr.numberPresentationColumn = -1;
-                pbr.typeColumn = NUMBERTYPE_COLUMN_INDEX;
-                pbr.nameColumn = NAME_COLUMN_INDEX;
-                Log.i(TAG, " pbr.numberColumn: " + pbr.numberColumn +
-                           " pbr.numberPresentationColumn: " + pbr.numberPresentationColumn +
-                           " pbr.typeColumn: " + pbr.typeColumn +
-                           " pbr.nameColumn: " + pbr.nameColumn);
-            } else {
-                final Uri phoneContentUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
-                try {
-                    pbr.cursor = mContentResolver.query(phoneContentUri, PHONES_PROJECTION,
-                            where, null, Phone.NUMBER + " LIMIT " + MAX_PHONEBOOK_SIZE);
-                    Log.i(TAG, "queryPhonebook where " + where + " uri :" + phoneContentUri);
-                    if (pbr.cursor == null) {
-                        Log.i(TAG, "querying phone contacts on memory returned null.");
-                        return false;
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Exception while querying phone contacts on memory", e);
-                    return false;
-                }
-
-                Log.i(TAG, "Phone.NUMBER: " + Phone.NUMBER + " Phone.TYPE :" + Phone.TYPE +
-                              "Phone.DISPLAY_NAME :" + Phone.DISPLAY_NAME);
-                pbr.numberColumn = pbr.cursor.getColumnIndex(Phone.NUMBER);
-                pbr.numberPresentationColumn = -1;
-                pbr.typeColumn = pbr.cursor.getColumnIndex(Phone.TYPE);
-                pbr.nameColumn = pbr.cursor.getColumnIndex(Phone.DISPLAY_NAME);
-                Log.i(TAG, " pbr.numberColumn: " + pbr.numberColumn +
-                           " pbr.numberPresentationColumn: " + pbr.numberPresentationColumn +
-                           " pbr.typeColumn: " + pbr.typeColumn +
-                           " pbr.nameColumn: " + pbr.nameColumn);
+            final Uri phoneContentUri = DevicePolicyUtils.getEnterprisePhoneUri(mContext);
+            pbr.cursor = mContentResolver.query(phoneContentUri, PHONES_PROJECTION, where, null,
+                    Phone.NUMBER + " LIMIT " + MAX_PHONEBOOK_SIZE);
+            if (pbr.cursor == null) {
+                return false;
             }
+
+            pbr.numberColumn = pbr.cursor.getColumnIndex(Phone.NUMBER);
+            pbr.numberPresentationColumn = -1;
+            pbr.typeColumn = pbr.cursor.getColumnIndex(Phone.TYPE);
+            pbr.nameColumn = pbr.cursor.getColumnIndex(Phone.DISPLAY_NAME);
         }
         Log.i(TAG, "Refreshed phonebook " + pb + " with " + pbr.cursor.getCount() + " results");
         return true;
@@ -559,6 +485,12 @@ public class AtPhonebook {
         StringBuilder response = new StringBuilder();
         String record;
 
+        // Shortcut SM phonebook
+        if ("SM".equals(mCurrentPhonebook)) {
+            atCommandResult = HeadsetHalConstants.AT_RESPONSE_OK;
+            return atCommandResult;
+        }
+
         // Check phonebook
         PhonebookResult pbr = getPhonebookResult(mCurrentPhonebook, true); //false);
         if (pbr == null) {
@@ -596,24 +528,18 @@ public class AtPhonebook {
                 // try caller id lookup
                 // TODO: This code is horribly inefficient. I saw it
                 // take 7 seconds to process 100 missed calls.
-                try {
-                    Cursor c = mContentResolver.query(
-                            Uri.withAppendedPath(PhoneLookup.ENTERPRISE_CONTENT_FILTER_URI,
-                            number), new String[]{
+                Cursor c = mContentResolver.query(
+                        Uri.withAppendedPath(PhoneLookup.ENTERPRISE_CONTENT_FILTER_URI, number),
+                        new String[]{
                                 PhoneLookup.DISPLAY_NAME, PhoneLookup.TYPE
-                            }, null, null, null);
-                    if (c != null) {
-                        if (c.moveToFirst()) {
-                            name = c.getString(0);
-                            type = c.getInt(1);
-                        }
-                        c.close();
+                        }, null, null, null);
+                if (c != null) {
+                    if (c.moveToFirst()) {
+                        name = c.getString(0);
+                        type = c.getInt(1);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Exception while querying phonebook database", e);
-                    return HeadsetHalConstants.AT_RESPONSE_ERROR;
+                    c.close();
                 }
-
                 if (DBG && name == null) {
                     log("Caller ID lookup failed for " + number);
                 }

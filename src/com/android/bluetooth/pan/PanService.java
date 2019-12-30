@@ -55,8 +55,7 @@ import java.util.List;
  */
 public class PanService extends ProfileService {
     private static final String TAG = "PanService";
-    private static final String LOG_TAG = "BluetoothPan";
-    private static final boolean DBG = Log.isLoggable(LOG_TAG, Log.DEBUG);
+    private static final boolean DBG = false;
     private static PanService sPanService;
 
     private static final String BLUETOOTH_IFACE_ADDR_START = "192.168.44.1";
@@ -326,11 +325,6 @@ public class PanService extends ProfileService {
             Log.e(TAG, "Pan Device not disconnected: " + device);
             return false;
         }
-        /* Cancel discovery while initiating PANU connection, if It's in progress */
-        if (mAdapter != null && mAdapter.isDiscovering()) {
-            Log.d(TAG,"Inquiry is going on, Cancelling inquiry while initiating PANU connection");
-            mAdapter.cancelDiscovery();
-        }
         Message msg = mHandler.obtainMessage(MESSAGE_CONNECT, device);
         mHandler.sendMessage(msg);
         return true;
@@ -500,10 +494,6 @@ public class PanService extends ProfileService {
                     + ", state: " + state + ", localRole:" + localRole + ", remoteRole:"
                     + remoteRole);
         }
-        if (device == null) {
-            Log.d(TAG, "BluetoothDevice is null, Ignoring state change ");
-            return;
-        }
         int prevState;
 
         BluetoothPanDevice panDevice = mPanDevices.get(device);
@@ -525,9 +515,8 @@ public class PanService extends ProfileService {
         // connect call will put us in STATE_DISCONNECTED. Then, the disconnect completes and
         // changes the state to STATE_DISCONNECTING. All future calls to BluetoothPan#connect
         // will fail until the caller explicitly calls BluetoothPan#disconnect.
-        if (prevState == BluetoothProfile.STATE_DISCONNECTED &&
-            (state == BluetoothProfile.STATE_DISCONNECTING ||
-             state == BluetoothProfile.STATE_DISCONNECTED)) {
+        if (prevState == BluetoothProfile.STATE_DISCONNECTED
+                && state == BluetoothProfile.STATE_DISCONNECTING) {
             Log.d(TAG, "Ignoring state change from " + prevState + " to " + state);
             mPanDevices.remove(device);
             return;

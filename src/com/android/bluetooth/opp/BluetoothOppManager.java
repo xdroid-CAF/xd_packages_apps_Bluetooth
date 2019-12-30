@@ -100,8 +100,6 @@ public class BluetoothOppManager {
 
     private static final int ALLOWED_INSERT_SHARE_THREAD_NUMBER = 3;
 
-    static boolean isReadyForFileSharing = true;
-
     // used to judge if need continue sending process after received a
     // ENABLED_ACTION
     public boolean mSendingFlag;
@@ -195,23 +193,6 @@ public class BluetoothOppManager {
         }
         return false;
     }
-
-    synchronized void removeWhitelist(String address) {
-        Log.d(TAG, " removeWhitelist :" + address);
-        if (address == null) {
-            return;
-        }
-        // Remove any existing entries
-        for (Iterator<Pair<String, Long>> iter = mWhitelist.iterator(); iter.hasNext(); ) {
-            Pair<String, Long> entry = iter.next();
-            if (entry.first.equals(address)) {
-                iter.remove();
-                Log.i(TAG," removeWhitelist device found removed ");
-            }
-        }
-        Log.d(TAG," removeWhitelist END :");
-    }
-
 
     /**
      * Restore data from preference

@@ -27,8 +27,6 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Collections;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -164,10 +162,10 @@ import java.util.UUID;
     }
 
     /** Our internal application list */
-    private List<App> mApps = Collections.synchronizedList(new ArrayList<App>());
+    private List<App> mApps = new ArrayList<App>();
 
     /** Internal map to keep track of logging information by app name */
-    Map<Integer, AppScanStats> mAppScanStats = new ConcurrentHashMap<Integer, AppScanStats>();
+    HashMap<Integer, AppScanStats> mAppScanStats = new HashMap<Integer, AppScanStats>();
 
     /** Internal list of connected devices **/
     Set<Connection> mConnections = new HashSet<Connection>();
@@ -266,6 +264,7 @@ import java.util.UUID;
                 Connection connection = i.next();
                 if (connection.connId == connId) {
                     i.remove();
+                    break;
                 }
             }
         }

@@ -18,7 +18,6 @@ package com.android.bluetooth.avrcpcontroller;
 
 import android.media.MediaMetadata;
 
-
 final class TrackInfo {
     /*
      *Element Id Values for GetMetaData  from JNI
@@ -74,7 +73,6 @@ final class TrackInfo {
                     break;
             }
         }
-		
         return metaDataBuilder.build();
     }
 }

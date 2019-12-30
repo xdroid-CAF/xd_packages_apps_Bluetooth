@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 
-import com.android.bluetooth.map.BluetoothMapCommonUtils.BMsgReaderExt;
 public abstract class BluetoothMapbMessage {
 
     protected static final String TAG = "BluetoothMapbMessage";
@@ -59,9 +58,7 @@ public abstract class BluetoothMapbMessage {
 
     private ArrayList<VCard> mOriginator = null;
     private ArrayList<VCard> mRecipient = null;
-    private ArrayList<String> mRecipientTo = null;
-    private ArrayList<String> mRecipientCc = null;
-    private ArrayList<String> mRecipientBCc = null;
+
 
     public static class VCard {
         /* VCARD attributes */
@@ -197,13 +194,6 @@ public abstract class BluetoothMapbMessage {
             }
         }
 
-        public String[] getEmailAddresses() {
-            if (mEmailAddresses.length > 0) {
-                return mEmailAddresses;
-            } else
-                throw new IllegalArgumentException("No Recipient Email Address");
-        }
-
         public String getFirstBtUci() {
             if (mBtUcis.length > 0) {
                 return mBtUcis[0];
@@ -289,7 +279,6 @@ public abstract class BluetoothMapbMessage {
                     }
                     // Empty phone number - ignore
                 } else if (line.startsWith("EMAIL:")) {
-                    line = line.replace("&lt;", "<").replace("&gt;", ">");
                     parts = line.split("[^\\\\]:"); // Split on "un-escaped" :
                     if (parts.length == 2) {
                         String[] subParts = parts[1].split("[^\\\\];");
@@ -334,7 +323,7 @@ public abstract class BluetoothMapbMessage {
 
     ;
 
-    protected static class BMsgReader {
+    private static class BMsgReader {
         InputStream mInStream;
 
         BMsgReader(InputStream is) {
@@ -382,14 +371,15 @@ public abstract class BluetoothMapbMessage {
         /**
          * Read a line of text from the BMessage.
          * @return the next line of text, or null at end of file, or if UTF-8 is not supported.
-         * @hide
          */
         public String getLine() {
             try {
                 byte[] line = getLineAsBytes();
-                if (BluetoothMapFixes.isLastLine(line))
+                if (line.length == 0) {
                     return null;
-                return new String(line, "UTF-8");
+                } else {
+                    return new String(line, "UTF-8");
+                }
             } catch (UnsupportedEncodingException e) {
                 Log.w(TAG, e);
                 return null;
@@ -495,7 +485,7 @@ public abstract class BluetoothMapbMessage {
 
     public static BluetoothMapbMessage parse(InputStream bMsgStream, int appParamCharset)
             throws IllegalArgumentException {
-        BMsgReaderExt reader;
+        BMsgReader reader;
         String line = "";
         BluetoothMapbMessage newBMsg = null;
         boolean status = false;
@@ -571,7 +561,7 @@ public abstract class BluetoothMapbMessage {
             Log.i(TAG, "The incoming bMessage have been dumped to " + file.getAbsolutePath());
         } /* End of if(V) log-section */
 
-        reader = new BluetoothMapCommonUtils.BMsgReaderExt(bMsgStream);
+        reader = new BMsgReader(bMsgStream);
         reader.expect("BEGIN:BMSG");
         reader.expect("VERSION");
 
@@ -620,7 +610,7 @@ public abstract class BluetoothMapbMessage {
                             newBMsg = new BluetoothMapbMessageMime();
                             break;
                         case EMAIL:
-                        newBMsg = new BluetoothMapbMessageExtEmail();
+                            newBMsg = new BluetoothMapbMessageEmail();
                             break;
                         case IM:
                             newBMsg = new BluetoothMapbMessageMime();
@@ -664,10 +654,6 @@ public abstract class BluetoothMapbMessage {
         }
         if (line.contains("BEGIN:BENV")) {
             newBMsg.parseEnvelope(reader, 0);
-            if ( type == TYPE.EMAIL && newBMsg instanceof BluetoothMapbMessageExtEmail) {
-                ((BluetoothMapbMessageExtEmail)newBMsg)
-                    .parseBodyEmail(reader.getLastStringTerminator("END:BBODY"));
-            }
         } else {
             throw new IllegalArgumentException("Bmessage has no BEGIN:BENV - line:" + line);
         }
@@ -711,7 +697,7 @@ public abstract class BluetoothMapbMessage {
             }
             parseEnvelope(reader, ++level); // Nested BENV
         }
-        if (mType != TYPE.EMAIL && line.contains("BEGIN:BBODY")) {
+        if (line.contains("BEGIN:BBODY")) {
             if (D) {
                 Log.d(TAG, "Decoding bbody");
             }
@@ -1077,27 +1063,5 @@ public abstract class BluetoothMapbMessage {
             Log.w(TAG, e);
             return null;
         }
-    }
-    public ArrayList<String> getmRecipientTo() {
-        return mRecipientTo;
-    }
-
-    public void setmRecipientTo(ArrayList<String> mRecipientTo) {
-        this.mRecipientTo = mRecipientTo;
-    }
-    public ArrayList<String> getmRecipientCc() {
-        return mRecipientCc;
-    }
-
-    public void setmRecipientCc(ArrayList<String> mRecipientCc) {
-        this.mRecipientCc = mRecipientCc;
-    }
-
-    public ArrayList<String> getmRecipientBCc() {
-        return mRecipientBCc;
-    }
-
-    public void setmRecipientBCc(ArrayList<String> mRecipientBCc) {
-        this.mRecipientBCc = mRecipientBCc;
     }
 }
