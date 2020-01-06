@@ -23,7 +23,7 @@ import android.telephony.SmsMessage;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-import com.android.internal.telephony.GsmAlphabet;
+import com.android.bluetooth.util.GsmAlphabet;
 import com.android.internal.telephony.SmsConstants;
 import com.android.internal.telephony.SmsHeader;
 import com.android.internal.telephony.cdma.sms.BearerData;
@@ -46,6 +46,13 @@ public class BluetoothMapSmsPdu {
     private static final int INVALID_VALUE = -1;
     public static final int SMS_TYPE_GSM = 1;
     public static final int SMS_TYPE_CDMA = 2;
+
+    /**
+     * from SMS user data header information element identifiers.
+     * (see TS 23.040 9.2.3.24)
+     */
+    private static final int ELT_ID_NATIONAL_LANGUAGE_SINGLE_SHIFT     = 0x24;
+    private static final int ELT_ID_NATIONAL_LANGUAGE_LOCKING_SHIFT    = 0x25;
 
 
     /* We need to handle the SC-address mentioned in errata 4335.
@@ -343,9 +350,9 @@ public class BluetoothMapSmsPdu {
                     } catch (IOException e) {
                         Log.w(TAG, "unable to read userDataHeader", e);
                     }
-                    SmsHeader userDataHeader = SmsHeader.fromByteArray(udh);
-                    mLanguageTable = userDataHeader.languageTable;
-                    mLanguageShiftTable = userDataHeader.languageShiftTable;
+                    int[] tableValue = getTableFromByteArray(udh);
+                    mLanguageTable = tableValue[0];
+                    mLanguageShiftTable = tableValue[1];
 
                     int headerBits = (userDataHeaderLength + 1) * 8;
                     int headerSeptets = headerBits / 7;
@@ -513,15 +520,11 @@ public class BluetoothMapSmsPdu {
         int activePhone = context.getSystemService(TelephonyManager.class)
                 .getCurrentPhoneType();
         int phoneType;
-        GsmAlphabet.TextEncodingDetails ted = (PHONE_TYPE_CDMA == activePhone)
-                ? com.android.internal.telephony.cdma.SmsMessage.calculateLength(
-                (CharSequence) messageText, false, true)
-                : com.android.internal.telephony.gsm.SmsMessage.calculateLength(
-                        (CharSequence) messageText, false);
+        int[] ted = SmsMessage.calculateLength((CharSequence) messageText, false);
 
         SmsPdu newPdu;
         String destinationAddress;
-        int msgCount = ted.msgCount;
+        int msgCount = ted[0];
         int encoding;
         int languageTable;
         int languageShiftTable;
@@ -533,9 +536,9 @@ public class BluetoothMapSmsPdu {
 
         // Default to GSM, as this code should not be used, if we neither have CDMA not GSM.
         phoneType = (activePhone == PHONE_TYPE_CDMA) ? SMS_TYPE_CDMA : SMS_TYPE_GSM;
-        encoding = ted.codeUnitSize;
-        languageTable = ted.languageTable;
-        languageShiftTable = ted.languageShiftTable;
+        encoding = ted[3];
+        languageTable = ted[4];
+        languageShiftTable = ted[5];
         destinationAddress = PhoneNumberUtils.stripSeparators(address);
         if (destinationAddress == null || destinationAddress.length() < 2) {
             destinationAddress =
@@ -788,6 +791,28 @@ public class BluetoothMapSmsPdu {
         }
 
         return messageBody;
+    }
+
+    private static int[] getTableFromByteArray(byte[] data) {
+        ByteArrayInputStream inStream = new ByteArrayInputStream(data);
+        /** tableValue[0]: languageTable
+         *  tableValue[1]: languageShiftTable */
+        int[] tableValue = new int[2];
+        while (inStream.available() > 0) {
+            int id = inStream.read();
+            int length = inStream.read();
+            switch (id) {
+                case ELT_ID_NATIONAL_LANGUAGE_SINGLE_SHIFT:
+                    tableValue[1] = inStream.read();
+                    break;
+                case ELT_ID_NATIONAL_LANGUAGE_LOCKING_SHIFT:
+                    tableValue[0] = inStream.read();
+                    break;
+                default:
+                    inStream.skip(length);
+            }
+        }
+        return tableValue;
     }
 
 }
