@@ -35,6 +35,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.StatsLog;
 
+import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.ProfileService;
 import com.android.internal.annotations.VisibleForTesting;
@@ -518,8 +519,9 @@ public class HeadsetStateMachine extends StateMachine {
                         stateLogI("accept incoming connection");
                         transitionTo(mConnecting);
                     } else {
-                        stateLogI("rejected incoming HF, priority=" + mHeadsetService.getPriority(
-                                mDevice) + " bondState=" + mAdapterService.getBondState(mDevice));
+                        stateLogI("rejected incoming HF, connectionPolicy="
+                                + mHeadsetService.getConnectionPolicy(mDevice) + " bondState="
+                                + mAdapterService.getBondState(mDevice));
                         // Reject the connection and stay in Disconnected state itself
                         if (!mNativeInterface.disconnectHfp(mDevice)) {
                             stateLogE("failed to disconnect");
@@ -1587,7 +1589,7 @@ public class HeadsetStateMachine extends StateMachine {
             if (number.charAt(number.length() - 1) == ';') {
                 number = number.substring(0, number.length() - 1);
             }
-            dialNumber = PhoneNumberUtils.convertPreDial(number);
+            dialNumber = Utils.convertPreDial(number);
         }
         if (!mHeadsetService.dialOutgoingCall(mDevice, dialNumber)) {
             Log.w(TAG, "processDialCall, failed to dial in service");
