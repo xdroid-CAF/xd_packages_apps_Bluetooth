@@ -18,6 +18,7 @@ package com.android.bluetooth.gatt;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
+import android.annotation.Nullable;
 import android.app.AppOpsManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -466,22 +467,25 @@ public class GattService extends ProfileService {
 
         @Override
         public void startScan(int scannerId, ScanSettings settings, List<ScanFilter> filters,
-                List storages, String callingPackage) {
+                List storages, String callingPackage, String callingFeatureId) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.startScan(scannerId, settings, filters, storages, callingPackage);
+            service.startScan(scannerId, settings, filters, storages, callingPackage,
+                    callingFeatureId);
         }
 
         @Override
         public void startScanForIntent(PendingIntent intent, ScanSettings settings,
-                List<ScanFilter> filters, String callingPackage) throws RemoteException {
+                List<ScanFilter> filters, String callingPackage, String callingFeatureId)
+                throws RemoteException {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.registerPiAndStartScan(intent, settings, filters, callingPackage);
+            service.registerPiAndStartScan(intent, settings, filters, callingPackage,
+                    callingFeatureId);
         }
 
         @Override
@@ -1095,7 +1099,9 @@ public class GattService extends ProfileService {
 
     /** Determines if the given scan client has the appropriate permissions to receive callbacks. */
     private boolean hasScanResultPermission(final ScanClient client) {
-        if (client.hasNetworkSettingsPermission || client.hasNetworkSetupWizardPermission) {
+        if (client.hasNetworkSettingsPermission
+                || client.hasNetworkSetupWizardPermission
+                || client.hasScanWithoutLocationPermission) {
             return true;
         }
         return client.hasLocationPermission && !Utils.blockedByLocationOff(this, client.userHandle);
@@ -1933,7 +1939,8 @@ public class GattService extends ProfileService {
     }
 
     void startScan(int scannerId, ScanSettings settings, List<ScanFilter> filters,
-            List<List<ResultStorageDescriptor>> storages, String callingPackage) {
+            List<List<ResultStorageDescriptor>> storages, String callingPackage,
+            @Nullable String callingFeatureId) {
         if (DBG) {
             Log.d(TAG, "start scan with filters");
         }
@@ -1947,18 +1954,18 @@ public class GattService extends ProfileService {
         mAppOps.checkPackage(Binder.getCallingUid(), callingPackage);
         scanClient.isQApp = Utils.isQApp(this, callingPackage);
         if (scanClient.isQApp) {
-            scanClient.hasLocationPermission =
-                    Utils.checkCallerHasFineLocation(
-                            this, mAppOps, callingPackage, scanClient.userHandle);
+            scanClient.hasLocationPermission = Utils.checkCallerHasFineLocation(this, mAppOps,
+                    callingPackage, callingFeatureId, scanClient.userHandle);
         } else {
-            scanClient.hasLocationPermission =
-                    Utils.checkCallerHasCoarseOrFineLocation(
-                            this, mAppOps, callingPackage, scanClient.userHandle);
+            scanClient.hasLocationPermission = Utils.checkCallerHasCoarseOrFineLocation(this,
+                    mAppOps, callingPackage, callingFeatureId, scanClient.userHandle);
         }
         scanClient.hasNetworkSettingsPermission =
                 Utils.checkCallerHasNetworkSettingsPermission(this);
         scanClient.hasNetworkSetupWizardPermission =
                 Utils.checkCallerHasNetworkSetupWizardPermission(this);
+        scanClient.hasScanWithoutLocationPermission =
+                Utils.checkCallerHasScanWithoutLocationPermission(this);
 
         AppScanStats app = mScannerMap.getAppScanStatsById(scannerId);
         ScannerMap.App cbApp = mScannerMap.getById(scannerId);
@@ -1976,7 +1983,7 @@ public class GattService extends ProfileService {
     }
 
     void registerPiAndStartScan(PendingIntent pendingIntent, ScanSettings settings,
-            List<ScanFilter> filters, String callingPackage) {
+            List<ScanFilter> filters, String callingPackage, @Nullable String callingFeatureId) {
         if (DBG) {
             Log.d(TAG, "start scan with filters, for PendingIntent");
         }
@@ -2008,10 +2015,10 @@ public class GattService extends ProfileService {
         try {
             if (app.mIsQApp) {
                 app.hasLocationPermission = Utils.checkCallerHasFineLocation(
-                      this, mAppOps, callingPackage, app.mUserHandle);
+                      this, mAppOps, callingPackage, callingFeatureId, app.mUserHandle);
             } else {
                 app.hasLocationPermission = Utils.checkCallerHasCoarseOrFineLocation(
-                      this, mAppOps, callingPackage, app.mUserHandle);
+                      this, mAppOps, callingPackage, callingFeatureId, app.mUserHandle);
             }
         } catch (SecurityException se) {
             // No need to throw here. Just mark as not granted.
@@ -2021,6 +2028,8 @@ public class GattService extends ProfileService {
                 Utils.checkCallerHasNetworkSettingsPermission(this);
         app.mHasNetworkSetupWizardPermission =
                 Utils.checkCallerHasNetworkSetupWizardPermission(this);
+        app.mHasScanWithoutLocationPermission =
+                Utils.checkCallerHasScanWithoutLocationPermission(this);
         mScanManager.registerScanner(uuid);
     }
 
@@ -2033,6 +2042,7 @@ public class GattService extends ProfileService {
         scanClient.isQApp = app.mIsQApp;
         scanClient.hasNetworkSettingsPermission = app.mHasNetworkSettingsPermission;
         scanClient.hasNetworkSetupWizardPermission = app.mHasNetworkSetupWizardPermission;
+        scanClient.hasScanWithoutLocationPermission = app.mHasScanWithoutLocationPermission;
 
         AppScanStats scanStats = mScannerMap.getAppScanStatsById(scannerId);
         if (scanStats != null) {
