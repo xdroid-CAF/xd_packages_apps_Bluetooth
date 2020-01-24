@@ -26,9 +26,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources.NotFoundException;
 import android.net.ConnectivityManager;
+import android.net.InetAddresses;
 import android.net.InterfaceConfiguration;
 import android.net.LinkAddress;
-import android.net.NetworkUtils;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.INetworkManagementService;
@@ -247,6 +247,15 @@ public class PanService extends ProfileService {
                 return false;
             }
             return service.disconnect(device);
+        }
+
+        @Override
+        public boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
+            PanService service = getService();
+            if (service == null) {
+                return false;
+            }
+            return service.setConnectionPolicy(device, connectionPolicy);
         }
 
         @Override
@@ -655,10 +664,10 @@ public class PanService extends ProfileService {
                 InetAddress addr = null;
                 LinkAddress linkAddr = ifcg.getLinkAddress();
                 if (linkAddr == null || (addr = linkAddr.getAddress()) == null || addr.equals(
-                        NetworkUtils.numericToInetAddress("0.0.0.0")) || addr.equals(
-                        NetworkUtils.numericToInetAddress("::0"))) {
+                        InetAddresses.parseNumericAddress("0.0.0.0")) || addr.equals(
+                        InetAddresses.parseNumericAddress("::0"))) {
                     address = BLUETOOTH_IFACE_ADDR_START;
-                    addr = NetworkUtils.numericToInetAddress(address);
+                    addr = InetAddresses.parseNumericAddress(address);
                 }
 
                 ifcg.setLinkAddress(new LinkAddress(addr, BLUETOOTH_PREFIX_LENGTH));

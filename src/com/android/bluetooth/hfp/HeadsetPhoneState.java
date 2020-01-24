@@ -21,7 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Looper;
+import android.os.Handler;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
@@ -31,11 +31,10 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.telephony.IccCardConstants;
-import com.android.internal.telephony.TelephonyIntents;
 
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 
 /**
@@ -52,6 +51,7 @@ public class HeadsetPhoneState {
     private final HeadsetService mHeadsetService;
     private final TelephonyManager mTelephonyManager;
     private final SubscriptionManager mSubscriptionManager;
+    private final Handler mHandler;
 
     private ServiceState mServiceState;
 
@@ -88,9 +88,10 @@ public class HeadsetPhoneState {
         mSubscriptionManager = SubscriptionManager.from(mHeadsetService);
         Objects.requireNonNull(mSubscriptionManager, "TELEPHONY_SUBSCRIPTION_SERVICE is null");
         // Initialize subscription on the handler thread
-        mOnSubscriptionsChangedListener = new HeadsetPhoneStateOnSubscriptionChangedListener(
-                headsetService.getStateMachinesThreadLooper());
-        mSubscriptionManager.addOnSubscriptionsChangedListener(mOnSubscriptionsChangedListener);
+        mHandler = new Handler(headsetService.getStateMachinesThreadLooper());
+        mOnSubscriptionsChangedListener = new HeadsetPhoneStateOnSubscriptionChangedListener();
+        mSubscriptionManager.addOnSubscriptionsChangedListener(command -> mHandler.post(command),
+                mOnSubscriptionsChangedListener);
     }
 
     /**
@@ -160,8 +161,7 @@ public class HeadsetPhoneState {
             return;
         }
         Log.i(TAG, "startListenForPhoneState(), subId=" + subId + ", enabled_events=" + events);
-        mPhoneStateListener = new HeadsetPhoneStateListener(
-                mHeadsetService.getStateMachinesThreadLooper());
+        mPhoneStateListener = new HeadsetPhoneStateListener(command -> mHandler.post(command));
         mTelephonyManager.listen(mPhoneStateListener, events);
         if ((events & PhoneStateListener.LISTEN_SIGNAL_STRENGTHS) != 0) {
             mTelephonyManager.setRadioIndicationUpdateMode(
@@ -260,13 +260,19 @@ public class HeadsetPhoneState {
 
     private class HeadsetPhoneStateOnSubscriptionChangedListener
             extends OnSubscriptionsChangedListener {
-        HeadsetPhoneStateOnSubscriptionChangedListener(Looper looper) {
-            super(looper);
+        HeadsetPhoneStateOnSubscriptionChangedListener() {
+            super();
         }
 
         @Override
         public void onSubscriptionsChanged() {
             synchronized (mDeviceEventMap) {
+                int simState = mTelephonyManager.getSimState();
+                if (simState != TelephonyManager.SIM_STATE_READY) {
+                    mCindSignal = 0;
+                    mCindService = HeadsetHalConstants.NETWORK_STATE_NOT_AVAILABLE;
+                    sendDeviceStateChanged();
+                }
                 stopListenForPhoneState();
                 startListenForPhoneState();
             }
@@ -274,8 +280,8 @@ public class HeadsetPhoneState {
     }
 
     private class HeadsetPhoneStateListener extends PhoneStateListener {
-        HeadsetPhoneStateListener(Looper looper) {
-            super(looper);
+        HeadsetPhoneStateListener(Executor executor) {
+            super(executor);
         }
 
         @Override
@@ -302,15 +308,15 @@ public class HeadsetPhoneState {
                 return;
             }
             IntentFilter simStateChangedFilter =
-                    new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+                    new IntentFilter(Intent.ACTION_SIM_STATE_CHANGED);
             mHeadsetService.registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
+                    if (Intent.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
                         // This is a sticky broadcast, so if it's already been loaded,
                         // this'll execute immediately.
-                        if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(
-                                intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE))) {
+                        if (Intent.SIM_STATE_LOADED.equals(
+                                intent.getStringExtra(Intent.EXTRA_SIM_STATE))) {
                             mIsSimStateLoaded = true;
                             sendDeviceStateChanged();
                             mHeadsetService.unregisterReceiver(this);
