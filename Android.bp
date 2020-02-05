@@ -52,7 +52,6 @@ android_app {
     jni_libs: ["libbluetooth_jni"],
     libs: [
         "javax.obex",
-        "telephony-common",
         "services.net",
     ],
     static_libs: [
@@ -79,5 +78,9 @@ android_app {
     optimize: {
         enabled: false,
     },
-    required: ["libbluetooth"]
+    required: ["libbluetooth"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+    ],
 }

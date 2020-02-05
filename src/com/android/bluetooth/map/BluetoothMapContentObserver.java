@@ -315,7 +315,7 @@ public class BluetoothMapContentObserver {
 
     public void setObserverRemoteFeatureMask(int remoteSupportedFeatures) {
         mMapSupportedFeatures =
-                remoteSupportedFeatures & BluetoothMapMasInstance.SDP_MAP_MAS_FEATURES;
+                remoteSupportedFeatures & BluetoothMapMasInstance.getFeatureMask();
         if ((BluetoothMapUtils.MAP_FEATURE_EXTENDED_EVENT_REPORT_11_BIT & mMapSupportedFeatures)
                 != 0) {
             mMapEventReportVersion = BluetoothMapUtils.MAP_EVENT_REPORT_V11;
@@ -1526,6 +1526,8 @@ public class BluetoothMapContentObserver {
                         }
                     } while (c.moveToNext());
                 }
+            } catch (IllegalStateException e) {
+                Log.w(TAG, e);
             } finally {
                 if (c != null) {
                     c.close();
@@ -1695,6 +1697,8 @@ public class BluetoothMapContentObserver {
                     } while (c.moveToNext());
 
                 }
+            } catch (IllegalStateException e) {
+                Log.w(TAG, e);
             } finally {
                 if (c != null) {
                     c.close();
