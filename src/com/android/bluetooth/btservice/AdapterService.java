@@ -74,9 +74,9 @@ import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
-import android.util.StatsLog;
 
 import com.android.bluetooth.BluetoothMetricsProto;
+import com.android.bluetooth.BluetoothStatsLog;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.a2dp.A2dpService;
 import com.android.bluetooth.a2dpsink.A2dpSinkService;
@@ -110,6 +110,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class AdapterService extends Service {
     private static final String TAG = "BluetoothAdapterService";
@@ -568,8 +569,8 @@ public class AdapterService extends Service {
         } catch (RemoteException e) {
             Log.w(TAG, "RemoteException trying to send a reset to BatteryStats");
         }
-        StatsLog.write_non_chained(StatsLog.BLE_SCAN_STATE_CHANGED, -1, null,
-                StatsLog.BLE_SCAN_STATE_CHANGED__STATE__RESET, false, false, false);
+        BluetoothStatsLog.write_non_chained(BluetoothStatsLog.BLE_SCAN_STATE_CHANGED, -1, null,
+                BluetoothStatsLog.BLE_SCAN_STATE_CHANGED__STATE__RESET, false, false, false);
 
         //Start Gatt service
         setProfileServiceState(GattService.class, BluetoothAdapter.STATE_ON);
@@ -1348,6 +1349,19 @@ public class AdapterService extends Service {
         }
 
         @Override
+        public List<BluetoothDevice> getMostRecentlyConnectedDevices() {
+            // don't check caller, may be called from system UI
+            AdapterService service = getService();
+            if (service == null) {
+                return new ArrayList<>();
+            }
+
+            enforceBluetoothAdminPermission(service);
+
+            return service.mDatabaseManager.getMostRecentlyConnectedDevices();
+        }
+
+        @Override
         public BluetoothDevice[] getBondedDevices() {
             // don't check caller, may be called from system UI
             AdapterService service = getService();
@@ -1484,6 +1498,20 @@ public class AdapterService extends Service {
         }
 
         @Override
+        public boolean removeActiveDevice(@ActiveDeviceUse int profiles) {
+            if (!Utils.checkCaller()) {
+                Log.w(TAG, "removeActiveDevice() - Not allowed for non-active user");
+                return false;
+            }
+
+            AdapterService service = getService();
+            if (service == null) {
+                return false;
+            }
+            return service.setActiveDevice(null, profiles);
+        }
+
+        @Override
         public boolean setActiveDevice(BluetoothDevice device, @ActiveDeviceUse int profiles) {
             if (!Utils.checkCaller()) {
                 Log.w(TAG, "setActiveDevice() - Not allowed for non-active user");
@@ -1566,7 +1594,7 @@ public class AdapterService extends Service {
                 return false;
             }
 
-            enforceBluetoothPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             DeviceProperties deviceProp = service.mRemoteDevices.getDeviceProperties(device);
             if (deviceProp == null) {
@@ -2307,7 +2335,8 @@ public class AdapterService extends Service {
      * @return false if profiles value is not one of the constants we accept, true otherwise
      */
     public boolean setActiveDevice(BluetoothDevice device, @ActiveDeviceUse int profiles) {
-        enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH ADMIN permission");
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
 
         boolean setA2dp = false;
         boolean setHeadset = false;
@@ -2551,7 +2580,7 @@ public class AdapterService extends Service {
     }
 
     void logUserBondResponse(BluetoothDevice device, boolean accepted, int event) {
-        StatsLog.write(StatsLog.BLUETOOTH_BOND_STATE_CHANGED,
+        BluetoothStatsLog.write(BluetoothStatsLog.BLUETOOTH_BOND_STATE_CHANGED,
                 obfuscateAddress(device), 0, device.getType(),
                 BluetoothDevice.BOND_BONDING,
                 event,
@@ -2973,7 +3002,7 @@ public class AdapterService extends Service {
     }
 
     private boolean isNiapMode() {
-        return Settings.Global.getInt(getContentResolver(), "niap_mode", 0) == 1;
+        return Settings.Global.getInt(getContentResolver(), "common_criteria_mode", 0) == 1;
     }
 
     /**
