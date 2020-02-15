@@ -35,8 +35,8 @@ import android.os.Looper;
 import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
-import android.util.StatsLog;
 
+import com.android.bluetooth.BluetoothStatsLog;
 import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.internal.annotations.VisibleForTesting;
@@ -44,6 +44,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.google.common.collect.EvictingQueue;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -133,6 +134,7 @@ public class DatabaseManager {
                                     .createDatabaseWithoutMigration(mAdapterService);
                             list = mDatabase.load();
                         }
+                        compactLastConnectionTime(list);
                         cacheMetadata(list);
                     }
                     break;
@@ -200,7 +202,7 @@ public class DatabaseManager {
                 if (mMetadataCache.containsKey(address)) {
                     return;
                 }
-                createMetadata(address);
+                createMetadata(address, false);
             } else {
                 Metadata metadata = mMetadataCache.get(address);
                 if (metadata != null) {
@@ -253,7 +255,7 @@ public class DatabaseManager {
 
             String address = device.getAddress();
             if (!mMetadataCache.containsKey(address)) {
-                createMetadata(address);
+                createMetadata(address, false);
             }
             Metadata data = mMetadataCache.get(address);
             byte[] oldValue = data.getCustomizedMeta(key);
@@ -336,7 +338,7 @@ public class DatabaseManager {
                 if (newConnectionPolicy == BluetoothProfile.CONNECTION_POLICY_UNKNOWN) {
                     return true;
                 }
-                createMetadata(address);
+                createMetadata(address, false);
             }
             Metadata data = mMetadataCache.get(address);
             int oldConnectionPolicy = data.getProfileConnectionPolicy(profile);
@@ -387,13 +389,6 @@ public class DatabaseManager {
 
             Metadata data = mMetadataCache.get(address);
             int connectionPolicy = data.getProfileConnectionPolicy(profile);
-
-            // If result is PRIORITY_AUTO_CONNECT, return as CONNECTION_POLICY_ALLOWED
-            if (connectionPolicy > BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
-                setProfileConnectionPolicy(device, profile,
-                        BluetoothProfile.CONNECTION_POLICY_ALLOWED);
-                connectionPolicy = BluetoothProfile.CONNECTION_POLICY_ALLOWED;
-            }
 
             Log.v(TAG, "getProfileConnectionPolicy: " + address + ", profile=" + profile
                     + ", connectionPolicy = " + connectionPolicy);
@@ -544,6 +539,159 @@ public class DatabaseManager {
     }
 
     /**
+     * Updates the time this device was last connected
+     *
+     * @param device is the remote bluetooth device for which we are setting the connection time
+     */
+    public void setConnection(BluetoothDevice device, boolean isA2dpDevice) {
+        synchronized (mMetadataCache) {
+            Log.d(TAG, "setConnection: device=" + device + " and isA2dpDevice=" + isA2dpDevice);
+            if (device == null) {
+                Log.e(TAG, "setConnection: device is null");
+                return;
+            }
+
+            if (isA2dpDevice) {
+                resetActiveA2dpDevice();
+            }
+
+            String address = device.getAddress();
+
+            if (!mMetadataCache.containsKey(address)) {
+                Log.d(TAG, "setConnection: Creating new metadata entry for device: " + device);
+                createMetadata(address, isA2dpDevice);
+                return;
+            }
+            // Updates last_active_time to the current counter value and increments the counter
+            Metadata metadata = mMetadataCache.get(address);
+            metadata.last_active_time = MetadataDatabase.sCurrentConnectionNumber++;
+
+            // Only update is_active_a2dp_device if an a2dp device is connected
+            if (isA2dpDevice) {
+                metadata.is_active_a2dp_device = true;
+            }
+
+            Log.d(TAG, "Updating last connected time for device: " + device + " to "
+                    + metadata.last_active_time);
+            updateDatabase(metadata);
+        }
+    }
+
+    /**
+     * Sets is_active_device to false if currently true for device
+     *
+     * @param device is the remote bluetooth device with which we have disconnected a2dp
+     */
+    public void setDisconnection(BluetoothDevice device) {
+        synchronized (mMetadataCache) {
+            if (device == null) {
+                Log.e(TAG, "setDisconnection: device is null");
+                return;
+            }
+
+            String address = device.getAddress();
+
+            if (!mMetadataCache.containsKey(address)) {
+                return;
+            }
+            // Updates last connected time to either current time if connected or -1 if disconnected
+            Metadata metadata = mMetadataCache.get(address);
+            if (metadata.is_active_a2dp_device) {
+                metadata.is_active_a2dp_device = false;
+                Log.d(TAG, "setDisconnection: Updating is_active_device to false for device: "
+                        + device);
+                updateDatabase(metadata);
+            }
+        }
+    }
+
+    /**
+     * Remove a2dpActiveDevice from the current active device in the connection order table
+     */
+    private void resetActiveA2dpDevice() {
+        synchronized (mMetadataCache) {
+            Log.d(TAG, "resetActiveA2dpDevice()");
+            for (Map.Entry<String, Metadata> entry : mMetadataCache.entrySet()) {
+                Metadata metadata = entry.getValue();
+                if (metadata.is_active_a2dp_device) {
+                    Log.d(TAG, "resetActiveA2dpDevice");
+                    metadata.is_active_a2dp_device = false;
+                    updateDatabase(metadata);
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the most recently connected bluetooth devices in order with most recently connected
+     * first and least recently connected last
+     *
+     * @return a {@link List} of {@link BluetoothDevice} representing connected bluetooth devices
+     * in order of most recently connected
+     */
+    public List<BluetoothDevice> getMostRecentlyConnectedDevices() {
+        List<BluetoothDevice> mostRecentlyConnectedDevices = new ArrayList<>();
+        synchronized (mMetadataCache) {
+            List<Metadata> sortedMetadata = new ArrayList<>(mMetadataCache.values());
+            sortedMetadata.sort((o1, o2) -> Long.compare(o2.last_active_time, o1.last_active_time));
+            for (Metadata metadata : sortedMetadata) {
+                try {
+                    mostRecentlyConnectedDevices.add(BluetoothAdapter.getDefaultAdapter()
+                            .getRemoteDevice(metadata.getAddress()));
+                } catch (IllegalArgumentException ex) {
+                    Log.d(TAG, "getBondedDevicesOrdered: Invalid address for "
+                            + "device " + metadata.getAddress());
+                }
+            }
+        }
+        return mostRecentlyConnectedDevices;
+    }
+
+    /**
+     * Gets the last active a2dp device
+     *
+     * @return the most recently active a2dp device or null if the last a2dp device was null
+     */
+    public BluetoothDevice getMostRecentlyConnectedA2dpDevice() {
+        synchronized (mMetadataCache) {
+            for (Map.Entry<String, Metadata> entry : mMetadataCache.entrySet()) {
+                Metadata metadata = entry.getValue();
+                if (metadata.is_active_a2dp_device) {
+                    try {
+                        return BluetoothAdapter.getDefaultAdapter().getRemoteDevice(
+                                metadata.getAddress());
+                    } catch (IllegalArgumentException ex) {
+                        Log.d(TAG, "getMostRecentlyConnectedA2dpDevice: Invalid address for "
+                                + "device " + metadata.getAddress());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     *
+     * @param metadataList is the list of metadata
+     */
+    private void compactLastConnectionTime(List<Metadata> metadataList) {
+        Log.d(TAG, "compactLastConnectionTime: Compacting metadata after load");
+        MetadataDatabase.sCurrentConnectionNumber = 0;
+        // Have to go in reverse order as list is ordered by descending last_active_time
+        for (int index = metadataList.size() - 1; index >= 0; index--) {
+            Metadata metadata = metadataList.get(index);
+            if (metadata.last_active_time != MetadataDatabase.sCurrentConnectionNumber) {
+                Log.d(TAG, "compactLastConnectionTime: Setting last_active_item for device: "
+                        + metadata.getAddress() + " from " + metadata.last_active_time + " to "
+                        + MetadataDatabase.sCurrentConnectionNumber);
+                metadata.last_active_time = MetadataDatabase.sCurrentConnectionNumber;
+                updateDatabase(metadata);
+                MetadataDatabase.sCurrentConnectionNumber++;
+            }
+        }
+    }
+
+    /**
      * Get the {@link Looper} for the handler thread. This is used in testing and helper
      * objects
      *
@@ -616,8 +764,9 @@ public class DatabaseManager {
         mMetadataCache.clear();
     }
 
-    void createMetadata(String address) {
+    void createMetadata(String address, boolean isActiveA2dpDevice) {
         Metadata data = new Metadata(address);
+        data.is_active_a2dp_device = isActiveA2dpDevice;
         mMetadataCache.put(address, data);
         updateDatabase(data);
         logMetadataChange(address, "Metadata created");
@@ -867,7 +1016,8 @@ public class DatabaseManager {
         mHandler.sendMessage(message);
     }
 
-    private void deleteDatabase(Metadata data) {
+    @VisibleForTesting
+    void deleteDatabase(Metadata data) {
         String address = data.getAddress();
         if (address == null) {
             Log.e(TAG, "deleteDatabase: address is null");
@@ -904,7 +1054,7 @@ public class DatabaseManager {
                 // Do not log anything if metadata doesn't fall into above categories
                 return;
         }
-        StatsLog.write(StatsLog.BLUETOOTH_DEVICE_INFO_REPORTED,
+        BluetoothStatsLog.write(BluetoothStatsLog.BLUETOOTH_DEVICE_INFO_REPORTED,
                 mAdapterService.obfuscateAddress(device),
                 BluetoothProtoEnums.DEVICE_INFO_EXTERNAL, callingApp, manufacturerName, modelName,
                 hardwareVersion, softwareVersion);
