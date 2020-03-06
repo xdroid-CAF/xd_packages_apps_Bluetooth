@@ -1440,7 +1440,7 @@ public class AdapterService extends Service {
                 return false;
             }
 
-            enforceBluetoothAdminPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             DeviceProperties deviceProp = service.mRemoteDevices.getDeviceProperties(device);
             if (deviceProp != null) {
@@ -1457,7 +1457,7 @@ public class AdapterService extends Service {
                 return false;
             }
 
-            enforceBluetoothAdminPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             DeviceProperties deviceProp = service.mRemoteDevices.getDeviceProperties(device);
             if (deviceProp == null || deviceProp.getBondState() != BluetoothDevice.BOND_BONDED) {
@@ -1492,7 +1492,7 @@ public class AdapterService extends Service {
                 return false;
             }
 
-            enforceBluetoothPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             DeviceProperties deviceProp = service.mRemoteDevices.getDeviceProperties(device);
             return deviceProp != null && deviceProp.isBondingInitiatedLocally();
@@ -1768,7 +1768,7 @@ public class AdapterService extends Service {
                 return BluetoothDevice.ACCESS_UNKNOWN;
             }
 
-            enforceBluetoothPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             return service.getDeviceAccessFromPrefs(device, PHONEBOOK_ACCESS_PERMISSION_PREFERENCE_FILE);
         }
@@ -1793,7 +1793,7 @@ public class AdapterService extends Service {
                 return BluetoothDevice.ACCESS_UNKNOWN;
             }
 
-            enforceBluetoothPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             return service.getDeviceAccessFromPrefs(device, MESSAGE_ACCESS_PERMISSION_PREFERENCE_FILE);
         }
@@ -1869,7 +1869,7 @@ public class AdapterService extends Service {
                 return BluetoothDevice.BATTERY_LEVEL_UNKNOWN;
             }
 
-            enforceBluetoothPermission(service);
+            enforceBluetoothPrivilegedPermission(service);
 
             DeviceProperties deviceProp = service.mRemoteDevices.getDeviceProperties(device);
             if (deviceProp == null) {
