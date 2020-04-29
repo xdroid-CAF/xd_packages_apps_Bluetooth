@@ -1410,7 +1410,11 @@ public class BluetoothMapContentObserver {
             try {
                 if (c != null && c.moveToFirst()) {
                     do {
-                        long id = c.getLong(c.getColumnIndex(Sms._ID));
+                        int idIndex = c.getColumnIndexOrThrow(Sms._ID);
+                        if (c.isNull(idIndex)) {
+                            throw new IllegalStateException("ID is null");
+                        }
+                        long id = c.getLong(idIndex);
                         int type = c.getInt(c.getColumnIndex(Sms.TYPE));
                         int threadId = c.getInt(c.getColumnIndex(Sms.THREAD_ID));
                         int read = c.getInt(c.getColumnIndex(Sms.READ));
@@ -1526,8 +1530,6 @@ public class BluetoothMapContentObserver {
                         }
                     } while (c.moveToNext());
                 }
-            } catch (IllegalStateException e) {
-                Log.w(TAG, e);
             } finally {
                 if (c != null) {
                     c.close();
@@ -1568,7 +1570,11 @@ public class BluetoothMapContentObserver {
             try {
                 if (c != null && c.moveToFirst()) {
                     do {
-                        long id = c.getLong(c.getColumnIndex(Mms._ID));
+                        int idIndex = c.getColumnIndexOrThrow(Mms._ID);
+                        if (c.isNull(idIndex)) {
+                            throw new IllegalStateException("ID is null");
+                        }
+                        long id = c.getLong(idIndex);
                         int type = c.getInt(c.getColumnIndex(Mms.MESSAGE_BOX));
                         int mtype = c.getInt(c.getColumnIndex(Mms.MESSAGE_TYPE));
                         int threadId = c.getInt(c.getColumnIndex(Mms.THREAD_ID));
@@ -1697,8 +1703,6 @@ public class BluetoothMapContentObserver {
                     } while (c.moveToNext());
 
                 }
-            } catch (IllegalStateException e) {
-                Log.w(TAG, e);
             } finally {
                 if (c != null) {
                     c.close();
@@ -2679,7 +2683,21 @@ public class BluetoothMapContentObserver {
                 }
                 getMsgListMsg().put(handle, newMsg);
             }
-        } else { // type SMS_* of MMS
+        } else if (msg.getType().equals(TYPE.MMS) && (recipientList.size() > 1)) {
+            // Group MMS
+            String folder = folderElement.getName();
+            ArrayList<String> telNums = new ArrayList<String>();
+            for (BluetoothMapbMessage.VCard recipient : recipientList) {
+                // Only send the message to the top level recipient
+                if (recipient.getEnvLevel() == 0) {
+                    // Only send to recipient's first phone number
+                    telNums.add(recipient.getFirstPhoneNumber());
+                }
+            }
+            // Send message if folder is outbox else just store in draft
+            handle = sendMmsMessage(folder, telNums.toArray(new String[telNums.size()]),
+                    (BluetoothMapbMessageMime) msg, transparent, retry);
+        } else { // type SMS_* (single or mass text) or single MMS
             for (BluetoothMapbMessage.VCard recipient : recipientList) {
                 // Only send the message to the top level recipient
                 if (recipient.getEnvLevel() == 0) {
@@ -2716,8 +2734,8 @@ public class BluetoothMapContentObserver {
 
                     if (msg.getType().equals(TYPE.MMS)) {
                         /* Send message if folder is outbox else just store in draft*/
-                        handle = sendMmsMessage(folder, phone, (BluetoothMapbMessageMime) msg,
-                                transparent, retry);
+                        handle = sendMmsMessage(folder, new String[] {phone},
+                                (BluetoothMapbMessageMime) msg, transparent, retry);
                     } else if (msg.getType().equals(TYPE.SMS_GSM) || msg.getType()
                             .equals(TYPE.SMS_CDMA)) {
                         /* Add the message to the database */
@@ -2807,7 +2825,7 @@ public class BluetoothMapContentObserver {
         return handle;
     }
 
-    public long sendMmsMessage(String folder, String toAddress, BluetoothMapbMessageMime msg,
+    public long sendMmsMessage(String folder, String[] toAddress, BluetoothMapbMessageMime msg,
             int transparent, int retry) {
         /*
          *strategy:
@@ -2892,7 +2910,7 @@ public class BluetoothMapContentObserver {
         }
     }
 
-    private long pushMmsToFolder(int folder, String toAddress, BluetoothMapbMessageMime msg) {
+    private long pushMmsToFolder(int folder, String[] toAddress, BluetoothMapbMessageMime msg) {
         /**
          * strategy:
          * 1) parse msg into parts + header
@@ -3092,7 +3110,7 @@ public class BluetoothMapContentObserver {
 
         values.clear();
         values.put(Mms.Addr.CONTACT_ID, "null");
-        values.put(Mms.Addr.ADDRESS, toAddress);
+        values.put(Mms.Addr.ADDRESS, String.join(",", toAddress));
         values.put(Mms.Addr.TYPE, BluetoothMapContent.MMS_TO);
         values.put(Mms.Addr.CHARSET, 106);
 

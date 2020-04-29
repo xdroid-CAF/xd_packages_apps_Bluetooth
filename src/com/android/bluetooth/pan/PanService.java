@@ -79,6 +79,7 @@ public class PanService extends ProfileService {
     private boolean mTetherOn = false;
 
     private BluetoothTetheringNetworkFactory mNetworkFactory;
+    private boolean mStarted = false;
 
 
     static {
@@ -124,9 +125,8 @@ public class PanService extends ProfileService {
 
         mUserManager = (UserManager) getSystemService(Context.USER_SERVICE);
 
-        mNetworkFactory =
-                new BluetoothTetheringNetworkFactory(getBaseContext(), getMainLooper(), this);
         setPanService(this);
+        mStarted = true;
 
         return true;
     }
@@ -360,6 +360,8 @@ public class PanService extends ProfileService {
     }
 
     public int getConnectionState(BluetoothDevice device) {
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         BluetoothPanDevice panDevice = mPanDevices.get(device);
         if (panDevice == null) {
             return BluetoothPan.STATE_DISCONNECTED;
@@ -383,7 +385,8 @@ public class PanService extends ProfileService {
 
     public boolean isTetheringOn() {
         // TODO(BT) have a variable marking the on/off state
-        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         return mTetherOn;
     }
 
@@ -391,7 +394,8 @@ public class PanService extends ProfileService {
         if (DBG) {
             Log.d(TAG, "setBluetoothTethering: " + value + ", mTetherOn: " + mTetherOn);
         }
-        enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH_ADMIN permission");
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         final Context context = getBaseContext();
 
         ConnectivityManager.enforceTetherChangePermission(context, pkgName);
@@ -426,7 +430,8 @@ public class PanService extends ProfileService {
      * @return true if connectionPolicy is set, false on error
      */
     public boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
-        enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH_ADMIN permission");
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         if (DBG) {
             Log.d(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
         }
@@ -461,7 +466,8 @@ public class PanService extends ProfileService {
     }
 
     public List<BluetoothDevice> getConnectedDevices() {
-        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        enforceCallingOrSelfPermission(
+                BLUETOOTH_PRIVILEGED, "Need BLUETOOTH_PRIVILEGED permission");
         List<BluetoothDevice> devices =
                 getDevicesMatchingConnectionStates(new int[]{BluetoothProfile.STATE_CONNECTED});
         return devices;
@@ -605,14 +611,20 @@ public class PanService extends ProfileService {
                     mNapIfaceAddr = null;
                 }
             }
-        } else if (mNetworkFactory != null) {
+        } else if (mStarted) {
             // PANU Role = reverse Tether
+
             Log.d(TAG, "handlePanDeviceStateChange LOCAL_PANU_ROLE:REMOTE_NAP_ROLE state = " + state
                     + ", prevState = " + prevState);
             if (state == BluetoothProfile.STATE_CONNECTED) {
+                mNetworkFactory = new BluetoothTetheringNetworkFactory(
+                        getBaseContext(), getMainLooper(), this);
                 mNetworkFactory.startReverseTether(iface);
             } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                mNetworkFactory.stopReverseTether();
+                if (mNetworkFactory != null) {
+                    mNetworkFactory.stopReverseTether();
+                    mNetworkFactory = null;
+                }
                 mPanDevices.remove(device);
             }
         }
