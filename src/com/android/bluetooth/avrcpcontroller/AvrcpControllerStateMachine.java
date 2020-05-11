@@ -433,11 +433,29 @@ class AvrcpControllerStateMachine extends StateMachine {
 
                 case MESSAGE_PROCESS_PLAY_STATUS_CHANGED:
                     mAddressedPlayer.setPlayStatus(msg.arg1);
-                    BluetoothMediaBrowserService.notifyChanged(
-                            mAddressedPlayer.getPlaybackState());
-                    if (mAddressedPlayer.getPlaybackState().getState()
-                            == PlaybackStateCompat.STATE_PLAYING
-                            && A2dpSinkService.getFocusState() == AudioManager.AUDIOFOCUS_NONE) {
+                    if (!isActive()) {
+                        sendMessage(MSG_AVRCP_PASSTHRU,
+                                AvrcpControllerService.PASS_THRU_CMD_ID_PAUSE);
+                        return true;
+                    }
+
+                    PlaybackStateCompat playbackState = mAddressedPlayer.getPlaybackState();
+                    BluetoothMediaBrowserService.notifyChanged(playbackState);
+
+                    int focusState = AudioManager.ERROR;
+                    A2dpSinkService a2dpSinkService = A2dpSinkService.getA2dpSinkService();
+                    if (a2dpSinkService != null) {
+                        focusState = a2dpSinkService.getFocusState();
+                    }
+
+                    if (focusState == AudioManager.ERROR) {
+                        sendMessage(MSG_AVRCP_PASSTHRU,
+                                AvrcpControllerService.PASS_THRU_CMD_ID_PAUSE);
+                        return true;
+                    }
+
+                    if (playbackState.getState() == PlaybackStateCompat.STATE_PLAYING
+                            && focusState == AudioManager.AUDIOFOCUS_NONE) {
                         if (shouldRequestFocus()) {
                             mSessionCallbacks.onPrepare();
                         } else {
@@ -460,11 +478,25 @@ class AvrcpControllerStateMachine extends StateMachine {
                 case MESSAGE_PROCESS_ADDRESSED_PLAYER_CHANGED:
                     mAddressedPlayerId = msg.arg1;
                     logD("AddressedPlayer = " + mAddressedPlayerId);
+
+                    // The now playing list is tied to the addressed player by specification in
+                    // AVRCP 5.9.1. A new addressed player means our now playing content is now
+                    // invalid
+                    mBrowseTree.mNowPlayingNode.setCached(false);
+                    if (isActive()) {
+                        BluetoothMediaBrowserService.notifyChanged(mBrowseTree.mNowPlayingNode);
+                    }
+
                     AvrcpPlayer updatedPlayer = mAvailablePlayerList.get(mAddressedPlayerId);
                     if (updatedPlayer != null) {
                         mAddressedPlayer = updatedPlayer;
+                        // If the new player supports the now playing feature then fetch it
+                        if (mAddressedPlayer.supportsFeature(AvrcpPlayer.FEATURE_NOW_PLAYING)) {
+                            sendMessage(MESSAGE_GET_FOLDER_ITEMS, mBrowseTree.mNowPlayingNode);
+                        }
                         logD("AddressedPlayer = " + mAddressedPlayer.getName());
                     } else {
+                        logD("Addressed player changed to unknown ID=" + mAddressedPlayerId);
                         mBrowseTree.mRootNode.setCached(false);
                         mBrowseTree.mRootNode.setExpectedChildren(255);
                         BluetoothMediaBrowserService.notifyChanged(mBrowseTree.mRootNode);
