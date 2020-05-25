@@ -1923,9 +1923,11 @@ public class AdapterService extends Service {
         @Override
         public void registerCallback(IBluetoothCallback callback) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "registerCallback")) {
                 return;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             service.mCallbacks.register(callback);
         }
@@ -1933,9 +1935,12 @@ public class AdapterService extends Service {
         @Override
         public void unregisterCallback(IBluetoothCallback callback) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || service.mCallbacks == null
+                    || !callerIsSystemOrActiveUser(TAG, "unregisterCallback")) {
                 return;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             service.mCallbacks.unregister(callback);
         }
@@ -2071,9 +2076,11 @@ public class AdapterService extends Service {
         public boolean registerMetadataListener(IBluetoothMetadataListener listener,
                 BluetoothDevice device) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "registerMetadataListener")) {
                 return false;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             if (service.mMetadataListeners == null) {
                 return false;
@@ -2093,9 +2100,12 @@ public class AdapterService extends Service {
         @Override
         public boolean unregisterMetadataListener(BluetoothDevice device) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null
+                    || !callerIsSystemOrActiveUser(TAG, "unregisterMetadataListener")) {
                 return false;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             if (service.mMetadataListeners == null) {
                 return false;
@@ -2109,9 +2119,11 @@ public class AdapterService extends Service {
         @Override
         public boolean setMetadata(BluetoothDevice device, int key, byte[] value) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "setMetadata")) {
                 return false;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             if (value.length > BluetoothDevice.METADATA_MAX_LENGTH) {
                 return false;
@@ -2122,9 +2134,11 @@ public class AdapterService extends Service {
         @Override
         public byte[] getMetadata(BluetoothDevice device, int key) {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "getMetadata")) {
                 return null;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             return service.mDatabaseManager.getCustomMeta(device, key);
         }
@@ -2139,9 +2153,11 @@ public class AdapterService extends Service {
         @Override
         public void onLeServiceUp() {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "onLeServiceUp")) {
                 return;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             service.mAdapterStateMachine.sendMessage(AdapterState.USER_TURN_ON);
         }
@@ -2149,9 +2165,11 @@ public class AdapterService extends Service {
         @Override
         public void onBrEdrDown() {
             AdapterService service = getService();
-            if (service == null) {
+            if (service == null || !callerIsSystemOrActiveUser(TAG, "onBrEdrDown")) {
                 return;
             }
+
+            enforceBluetoothPrivilegedPermission(service);
 
             service.mAdapterStateMachine.sendMessage(AdapterState.BLE_TURN_OFF);
         }
