@@ -440,12 +440,13 @@ public class GattService extends ProfileService {
         }
 
         @Override
-        public void registerClient(ParcelUuid uuid, IBluetoothGattCallback callback) {
+        public void registerClient(ParcelUuid uuid, IBluetoothGattCallback callback,
+                boolean eattSupport) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.registerClient(uuid.getUuid(), callback);
+            service.registerClient(uuid.getUuid(), callback, eattSupport);
         }
 
         @Override
@@ -713,12 +714,13 @@ public class GattService extends ProfileService {
         }
 
         @Override
-        public void registerServer(ParcelUuid uuid, IBluetoothGattServerCallback callback) {
+        public void registerServer(ParcelUuid uuid, IBluetoothGattServerCallback callback,
+                boolean eattSupport) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.registerServer(uuid.getUuid(), callback);
+            service.registerServer(uuid.getUuid(), callback, eattSupport);
         }
 
         @Override
@@ -2328,14 +2330,16 @@ public class GattService extends ProfileService {
      * GATT Service functions - CLIENT
      *************************************************************************/
 
-    void registerClient(UUID uuid, IBluetoothGattCallback callback) {
+    void registerClient(UUID uuid, IBluetoothGattCallback callback,
+            boolean eattSupport) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) {
             Log.d(TAG, "registerClient() - UUID=" + uuid);
         }
         mClientMap.add(uuid, null, callback, null, this);
-        gattClientRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits());
+        gattClientRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(),
+                                    eattSupport);
     }
 
     void unregisterClient(int clientIf) {
@@ -2993,14 +2997,15 @@ public class GattService extends ProfileService {
      * GATT Service functions - SERVER
      *************************************************************************/
 
-    void registerServer(UUID uuid, IBluetoothGattServerCallback callback) {
+    void registerServer(UUID uuid, IBluetoothGattServerCallback callback, boolean eattSupport) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) {
             Log.d(TAG, "registerServer() - UUID=" + uuid);
         }
         mServerMap.add(uuid, null, callback, null, this);
-        gattServerRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits());
+        gattServerRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(),
+                                    eattSupport);
     }
 
     void unregisterServer(int serverIf) {
@@ -3409,7 +3414,8 @@ public class GattService extends ProfileService {
 
     private native int gattClientGetDeviceTypeNative(String address);
 
-    private native void gattClientRegisterAppNative(long appUuidLsb, long appUuidMsb);
+    private native void gattClientRegisterAppNative(long appUuidLsb, long appUuidMsb,
+            boolean eattSupport);
 
     private native void gattClientUnregisterAppNative(int clientIf);
 
@@ -3459,7 +3465,8 @@ public class GattService extends ProfileService {
             int minInterval, int maxInterval, int latency, int timeout, int minConnectionEventLen,
             int maxConnectionEventLen);
 
-    private native void gattServerRegisterAppNative(long appUuidLsb, long appUuidMsb);
+    private native void gattServerRegisterAppNative(long appUuidLsb, long appUuidMsb,
+            boolean eattSupport);
 
     private native void gattServerUnregisterAppNative(int serverIf);
 
