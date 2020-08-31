@@ -149,7 +149,7 @@ public final class BluetoothKeystoreServiceTest {
         mBluetoothKeystoreService = null;
     }
 
-    private static boolean isPrimaryUser() {
+    private boolean isPrimaryUser() {
         return Binder.getCallingUid() == Process.BLUETOOTH_UID;
     }
 

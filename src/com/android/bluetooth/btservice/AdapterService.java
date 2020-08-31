@@ -71,6 +71,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Base64;
@@ -441,7 +442,7 @@ public class AdapterService extends Service {
         mBluetoothKeystoreService = new BluetoothKeystoreService(isNiapMode());
         mBluetoothKeystoreService.start();
         int configCompareResult = mBluetoothKeystoreService.getCompareResult();
-        initNative(isGuest(), isNiapMode(), configCompareResult);
+        initNative(isGuest(), isNiapMode(), configCompareResult, getInitFlags());
         mNativeAvailable = true;
         mCallbacks = new RemoteCallbackList<IBluetoothCallback>();
         mAppOps = getSystemService(AppOpsManager.class);
@@ -460,6 +461,9 @@ public class AdapterService extends Service {
         mSdpManager = SdpManager.init(this);
         registerReceiver(mAlarmBroadcastReceiver, new IntentFilter(ACTION_ALARM_WAKEUP));
 
+        mDatabaseManager = new DatabaseManager(this);
+        mDatabaseManager.start(MetadataDatabase.createDatabase(this));
+
         // Phone policy is specific to phone implementations and hence if a device wants to exclude
         // it out then it can be disabled by using the flag below.
         if (getResources().getBoolean(com.android.bluetooth.R.bool.enable_phone_policy)) {
@@ -472,9 +476,6 @@ public class AdapterService extends Service {
 
         mActiveDeviceManager = new ActiveDeviceManager(this, new ServiceFactory());
         mActiveDeviceManager.start();
-
-        mDatabaseManager = new DatabaseManager(this);
-        mDatabaseManager.start(MetadataDatabase.createDatabase(this));
 
         mSilenceDeviceManager = new SilenceDeviceManager(this, new ServiceFactory(),
                 Looper.getMainLooper());
@@ -502,8 +503,10 @@ public class AdapterService extends Service {
         }.execute();
 
         try {
-            int systemUiUid = getApplicationContext().getPackageManager().getPackageUid(
-                    "com.android.systemui", PackageManager.MATCH_SYSTEM_ONLY);
+            int systemUiUid = getApplicationContext()
+                    .createContextAsUser(UserHandle.SYSTEM, /* flags= */ 0)
+                    .getPackageManager()
+                    .getPackageUid("com.android.systemui", PackageManager.MATCH_SYSTEM_ONLY);
 
             Utils.setSystemUiUid(systemUiUid);
         } catch (PackageManager.NameNotFoundException e) {
@@ -806,6 +809,7 @@ public class AdapterService extends Service {
         BluetoothAdapter.invalidateIsOffloadedFilteringSupportedCache();
         BluetoothDevice.invalidateBluetoothGetBondStateCache();
         BluetoothAdapter.invalidateBluetoothGetStateCache();
+        BluetoothAdapter.invalidateGetAdapterConnectionStateCache();
     }
 
     private void setProfileServiceState(Class service, int state) {
@@ -2666,15 +2670,15 @@ public class AdapterService extends Service {
         editor.apply();
     }
 
-    void setPhonebookAccessPermission(BluetoothDevice device, int value) {
+    public void setPhonebookAccessPermission(BluetoothDevice device, int value) {
         setDeviceAccessFromPrefs(device, value, PHONEBOOK_ACCESS_PERMISSION_PREFERENCE_FILE);
     }
 
-    void setMessageAccessPermission(BluetoothDevice device, int value) {
+    public void setMessageAccessPermission(BluetoothDevice device, int value) {
         setDeviceAccessFromPrefs(device, value, MESSAGE_ACCESS_PERMISSION_PREFERENCE_FILE);
     }
 
-    void setSimAccessPermission(BluetoothDevice device, int value) {
+    public void setSimAccessPermission(BluetoothDevice device, int value) {
         setDeviceAccessFromPrefs(device, value, SIM_ACCESS_PERMISSION_PREFERENCE_FILE);
     }
 
@@ -3064,6 +3068,15 @@ public class AdapterService extends Service {
                 .isCommonCriteriaModeEnabled(null);
     }
 
+    private static final String GD_CORE_FLAG = "INIT_gd_core";
+    private String[] getInitFlags() {
+        ArrayList<String> initFlags = new ArrayList<>();
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_CORE_FLAG, false)) {
+            initFlags.add(GD_CORE_FLAG);
+        }
+        return initFlags.toArray(new String[0]);
+    }
+
     /**
      *  Obfuscate Bluetooth MAC address into a PII free ID string
      *
@@ -3093,8 +3106,8 @@ public class AdapterService extends Service {
 
     static native void classInitNative();
 
-    native boolean initNative(boolean startRestricted, boolean isNiapMode,
-            int configCompareResult);
+    native boolean initNative(boolean startRestricted, boolean isNiapMode, int configCompareResult,
+            String[] initFlags);
 
     native void cleanupNative();
 
@@ -3123,13 +3136,13 @@ public class AdapterService extends Service {
     native boolean getDevicePropertyNative(byte[] address, int type);
 
     /*package*/
-    native boolean createBondNative(byte[] address, int transport);
+    public native boolean createBondNative(byte[] address, int transport);
 
     /*package*/
     native boolean createBondOutOfBandNative(byte[] address, int transport, OobData oobData);
 
     /*package*/
-    native boolean removeBondNative(byte[] address);
+    public native boolean removeBondNative(byte[] address);
 
     /*package*/
     native boolean cancelBondNative(byte[] address);

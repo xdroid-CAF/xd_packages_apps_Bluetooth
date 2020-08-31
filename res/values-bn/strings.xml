@@ -83,8 +83,8 @@
     <string name="bt_toast_4" msgid="4678812947604395649">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\" কে ফাইল পাঠানো হচ্ছে"</string>
     <string name="bt_toast_5" msgid="2846870992823019494">"\"<xliff:g id="RECIPIENT">%2$s</xliff:g>\" কে <xliff:g id="NUMBER">%1$s</xliff:g>টি ফাইল পাঠানো হচ্ছে"</string>
     <string name="bt_toast_6" msgid="1855266596936622458">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\" কে ফাইল পাঠানো বন্ধ করা হয়েছে"</string>
-    <string name="bt_sm_2_1_nosdcard" msgid="1791835163301501637">"\"<xliff:g id="SENDER">%1$s</xliff:g>\"-এর পাঠানো ফাইল সেভ করার জন্য ইউএসবি স্টোরেজে পর্যাপ্ত জায়গা নেই"</string>
-    <string name="bt_sm_2_1_default" msgid="9115512207909504071">"\"<xliff:g id="SENDER">%1$s</xliff:g>\"-এর পাঠানো ফাইল সেভ করার জন্য এসডি কার্ডে পর্যাপ্ত জায়গা নেই"</string>
+    <string name="bt_sm_2_1_nosdcard" msgid="5354343190503952837">"ফাইল সেভ করার মতো USB স্টোরেজে পর্যাপ্ত স্পেস নেই।"</string>
+    <string name="bt_sm_2_1_default" msgid="2497541206648973852">"ফাইল সেভ করার মতো এসডি কার্ডে পর্যাপ্ত স্পেস নেই।"</string>
     <string name="bt_sm_2_2" msgid="2965243265852680543">"জায়গা প্রয়োজন: <xliff:g id="SIZE">%1$s</xliff:g>"</string>
     <string name="ErrorTooManyRequests" msgid="8578277541472944529">"অনেকগুলি অনুরোধ প্রক্রিয়া করা হচ্ছে৷ পরে আবার চেষ্টা করুন৷"</string>
     <string name="status_pending" msgid="2503691772030877944">"ফাইল ট্রান্সফার করা এখনও শুরু হয়নি।"</string>

@@ -49,12 +49,14 @@ import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.MetricsLogger;
 import com.android.bluetooth.btservice.ProfileService;
+import com.android.bluetooth.btservice.storage.DatabaseManager;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class BluetoothMapService extends ProfileService {
@@ -113,6 +115,7 @@ public class BluetoothMapService extends ProfileService {
     private static final int MAS_ID_SMS_MMS = 0;
 
     private BluetoothAdapter mAdapter;
+    private DatabaseManager mDatabaseManager;
 
     private BluetoothMnsObexClient mBluetoothMnsObexClient = null;
 
@@ -588,14 +591,34 @@ public class BluetoothMapService extends ProfileService {
         }
     }
 
+    /**
+     * Set connection policy of the profile and tries to disconnect it if connectionPolicy is
+     * {@link BluetoothProfile#CONNECTION_POLICY_FORBIDDEN}
+     *
+     * <p> The device should already be paired.
+     * Connection policy can be one of:
+     * {@link BluetoothProfile#CONNECTION_POLICY_ALLOWED},
+     * {@link BluetoothProfile#CONNECTION_POLICY_FORBIDDEN},
+     * {@link BluetoothProfile#CONNECTION_POLICY_UNKNOWN}
+     *
+     * @param device Paired bluetooth device
+     * @param connectionPolicy is the connection policy to set to for this profile
+     * @return true if connectionPolicy is set, false on error
+     */
     boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
         enforceCallingOrSelfPermission(BLUETOOTH_PRIVILEGED,
                 "Need BLUETOOTH_PRIVILEGED permission");
         if (VERBOSE) {
             Log.v(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
         }
-        AdapterService.getAdapterService().getDatabase()
-                .setProfileConnectionPolicy(device, BluetoothProfile.MAP, connectionPolicy);
+
+        if (!mDatabaseManager.setProfileConnectionPolicy(device, BluetoothProfile.MAP,
+                  connectionPolicy)) {
+            return false;
+        }
+        if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
+            disconnect(device);
+        }
         return true;
     }
 
@@ -614,7 +637,7 @@ public class BluetoothMapService extends ProfileService {
     int getConnectionPolicy(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PRIVILEGED,
                 "Need BLUETOOTH_PRIVILEGED permission");
-        return AdapterService.getAdapterService().getDatabase()
+        return mDatabaseManager
                 .getProfileConnectionPolicy(device, BluetoothProfile.MAP);
     }
 
@@ -628,6 +651,10 @@ public class BluetoothMapService extends ProfileService {
         if (DEBUG) {
             Log.d(TAG, "start()");
         }
+
+        mDatabaseManager = Objects.requireNonNull(AdapterService.getAdapterService().getDatabase(),
+                "DatabaseManager cannot be null when MapService starts");
+
         HandlerThread thread = new HandlerThread("BluetoothMapHandler");
         thread.start();
         Looper looper = thread.getLooper();

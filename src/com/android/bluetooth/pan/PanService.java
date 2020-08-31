@@ -44,12 +44,14 @@ import com.android.bluetooth.Utils;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.MetricsLogger;
 import com.android.bluetooth.btservice.ProfileService;
+import com.android.bluetooth.btservice.storage.DatabaseManager;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Provides Bluetooth Pan Device profile, as a service in
@@ -72,6 +74,7 @@ public class PanService extends ProfileService {
     private String mNapIfaceAddr;
     private boolean mNativeAvailable;
 
+    private DatabaseManager mDatabaseManager;
     @VisibleForTesting
     UserManager mUserManager;
 
@@ -114,6 +117,9 @@ public class PanService extends ProfileService {
 
     @Override
     protected boolean start() {
+        mDatabaseManager = Objects.requireNonNull(AdapterService.getAdapterService().getDatabase(),
+                "DatabaseManager cannot be null when PanService starts");
+
         mPanDevices = new HashMap<BluetoothDevice, BluetoothPanDevice>();
         mBluetoothIfaceAddresses = new ArrayList<String>();
         try {
@@ -308,14 +314,14 @@ public class PanService extends ProfileService {
         }
 
         @Override
-        public void setBluetoothTethering(boolean value, String pkgName) {
+        public void setBluetoothTethering(boolean value, String pkgName, String attributionTag) {
             PanService service = getService();
             if (service == null) {
                 return;
             }
             Log.d(TAG, "setBluetoothTethering: " + value + ", pkgName: " + pkgName
                     + ", mTetherOn: " + service.mTetherOn);
-            service.setBluetoothTethering(value, pkgName);
+            service.setBluetoothTethering(value, pkgName, attributionTag);
         }
 
         @Override
@@ -391,7 +397,8 @@ public class PanService extends ProfileService {
         return mTetherOn;
     }
 
-    void setBluetoothTethering(boolean value, final String pkgName) {
+    void setBluetoothTethering(boolean value, final String pkgName,
+            final String callingAttributionTag) {
         if (DBG) {
             Log.d(TAG, "setBluetoothTethering: " + value + ", mTetherOn: " + mTetherOn);
         }
@@ -435,16 +442,17 @@ public class PanService extends ProfileService {
         if (DBG) {
             Log.d(TAG, "Saved connectionPolicy " + device + " = " + connectionPolicy);
         }
-        boolean setSuccessfully;
-        setSuccessfully = AdapterService.getAdapterService().getDatabase()
-                .setProfileConnectionPolicy(device, BluetoothProfile.PAN, connectionPolicy);
-        if (setSuccessfully && connectionPolicy == BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
+
+        if (!mDatabaseManager.setProfileConnectionPolicy(device, BluetoothProfile.PAN,
+                  connectionPolicy)) {
+            return false;
+        }
+        if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_ALLOWED) {
             connect(device);
-        } else if (setSuccessfully
-                && connectionPolicy == BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
+        } else if (connectionPolicy == BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
             disconnect(device);
         }
-        return setSuccessfully;
+        return true;
     }
 
     /**
@@ -461,7 +469,7 @@ public class PanService extends ProfileService {
      */
     public int getConnectionPolicy(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH_ADMIN permission");
-        return AdapterService.getAdapterService().getDatabase()
+        return mDatabaseManager
                 .getProfileConnectionPolicy(device, BluetoothProfile.PAN);
     }
 
