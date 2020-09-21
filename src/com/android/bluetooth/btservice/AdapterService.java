@@ -30,7 +30,6 @@ import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.AppOpsManager;
 import android.app.PendingIntent;
-import android.app.PropertyInvalidatedCache;
 import android.app.Service;
 import android.app.admin.DevicePolicyManager;
 import android.bluetooth.BluetoothActivityEnergyInfo;
@@ -442,7 +441,11 @@ public class AdapterService extends Service {
         mBluetoothKeystoreService = new BluetoothKeystoreService(isNiapMode());
         mBluetoothKeystoreService.start();
         int configCompareResult = mBluetoothKeystoreService.getCompareResult();
-        initNative(isGuest(), isNiapMode(), configCompareResult, getInitFlags());
+
+        // Android TV doesn't show consent dialogs for just works and encryption only le pairing
+        boolean isAtvDevice = getApplicationContext().getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_LEANBACK_ONLY);
+        initNative(isGuest(), isNiapMode(), configCompareResult, getInitFlags(), isAtvDevice);
         mNativeAvailable = true;
         mCallbacks = new RemoteCallbackList<IBluetoothCallback>();
         mAppOps = getSystemService(AppOpsManager.class);
@@ -3069,10 +3072,26 @@ public class AdapterService extends Service {
     }
 
     private static final String GD_CORE_FLAG = "INIT_gd_core";
+    private static final String GD_ADVERTISING_FLAG = "INIT_gd_advertising";
+    private static final String GD_HCI_FLAG = "INIT_gd_hci";
+    private static final String GD_CONTROLLER_FLAG = "INIT_gd_controller";
+    private static final String GD_ACL_FLAG = "INIT_gd_acl";
     private String[] getInitFlags() {
         ArrayList<String> initFlags = new ArrayList<>();
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_CORE_FLAG, false)) {
             initFlags.add(GD_CORE_FLAG);
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_ADVERTISING_FLAG, false)) {
+            initFlags.add(GD_ADVERTISING_FLAG);
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_HCI_FLAG, false)) {
+            initFlags.add(GD_HCI_FLAG);
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_CONTROLLER_FLAG, false)) {
+            initFlags.add(GD_CONTROLLER_FLAG);
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_ACL_FLAG, false)) {
+            initFlags.add(GD_ACL_FLAG);
         }
         return initFlags.toArray(new String[0]);
     }
@@ -3107,7 +3126,7 @@ public class AdapterService extends Service {
     static native void classInitNative();
 
     native boolean initNative(boolean startRestricted, boolean isNiapMode, int configCompareResult,
-            String[] initFlags);
+            String[] initFlags, boolean isAtvDevice);
 
     native void cleanupNative();
 
