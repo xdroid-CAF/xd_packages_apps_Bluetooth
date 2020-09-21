@@ -83,8 +83,8 @@
     <string name="bt_toast_4" msgid="4678812947604395649">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\"ଙ୍କୁ ଫାଇଲ୍‌ ପଠାଯାଉଛି"</string>
     <string name="bt_toast_5" msgid="2846870992823019494">"\"<xliff:g id="RECIPIENT">%2$s</xliff:g>\"ଙ୍କୁ <xliff:g id="NUMBER">%1$s</xliff:g>ଟି ଫାଇଲ୍‌ ପଠାଯାଉଛି"</string>
     <string name="bt_toast_6" msgid="1855266596936622458">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\"ଙ୍କୁ ଫାଇଲ୍‌ ପଠାଇବା ବନ୍ଦ ହୋଇଗଲା"</string>
-    <string name="bt_sm_2_1_nosdcard" msgid="1791835163301501637">"\"<xliff:g id="SENDER">%1$s</xliff:g>\"ଙ୍କ ଠାରୁ ଫାଇଲ୍‌ ସେଭ୍‌ କରିବା ପାଇଁ USB ଷ୍ଟୋରେଜ୍‌ରେ ଯଥେଷ୍ଟ ସ୍ପେସ୍‌ ନାହିଁ"</string>
-    <string name="bt_sm_2_1_default" msgid="9115512207909504071">"\"<xliff:g id="SENDER">%1$s</xliff:g>\"ଙ୍କ ଠାରୁ ଫାଇଲ୍‌ ସେଭ୍‌ କରିବା ପାଇଁ SD କାର୍ଡରେ ଯଥେଷ୍ଟ ସ୍ପେସ୍‌ ନାହିଁ"</string>
+    <string name="bt_sm_2_1_nosdcard" msgid="5354343190503952837">"ଫାଇଲ୍ ସେଭ୍ କରିବାକୁ USB ଷ୍ଟୋରେଜରେ ଯଥେଷ୍ଟ ଜାଗା ନାହିଁ।"</string>
+    <string name="bt_sm_2_1_default" msgid="2497541206648973852">"ଫାଇଲ୍ ସେଭ୍ କରିବାକୁ SD କାର୍ଡରେ ଯଥେଷ୍ଟ ଜାଗା ନାହିଁ।"</string>
     <string name="bt_sm_2_2" msgid="2965243265852680543">"ସ୍ପେସ୍‌ ଆବଶ୍ୟକ: <xliff:g id="SIZE">%1$s</xliff:g>"</string>
     <string name="ErrorTooManyRequests" msgid="8578277541472944529">"ଅନେକ ଅନୁରୋଧ ଉପରେ କାମ ଚାଲୁଛି। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"</string>
     <string name="status_pending" msgid="2503691772030877944">"ଏପର୍ଯ୍ୟନ୍ତ ଫାଇଲ୍‌ ଟ୍ରାନ୍ସଫର୍‌ ଆରମ୍ଭ ହୋଇନାହିଁ।"</string>

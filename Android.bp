@@ -16,7 +16,10 @@ java_library {
 cc_library_shared {
     name: "libbluetooth_jni",
     srcs: ["jni/**/*.cpp"],
-    header_libs: ["libbluetooth_headers"],
+    header_libs: [
+        "jni_headers",
+        "libbluetooth_headers",
+    ],
     include_dirs: [
         "system/bt/types",
     ],
@@ -24,11 +27,10 @@ cc_library_shared {
         "libbase",
         "libchrome",
         "liblog",
+        "libnativehelper",
     ],
     static_libs: [
         "libbluetooth-types",
-        // TODO(b/148645937) move this back to shared_libs
-        "libnativehelper",
     ],
     cflags: [
         "-Wall",

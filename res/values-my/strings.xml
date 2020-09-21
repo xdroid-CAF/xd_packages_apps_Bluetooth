@@ -83,8 +83,8 @@
     <string name="bt_toast_4" msgid="4678812947604395649">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\"ထံသို့ ဖိုင်ကိုပို့ပါ"</string>
     <string name="bt_toast_5" msgid="2846870992823019494">"<xliff:g id="NUMBER">%1$s</xliff:g> ဖိုင်ကို \"<xliff:g id="RECIPIENT">%2$s</xliff:g>\"ထံသို့ ပို့ပါ"</string>
     <string name="bt_toast_6" msgid="1855266596936622458">"\"<xliff:g id="RECIPIENT">%1$s</xliff:g>\"ထံသို့ ဖိုင်ကိုပို့ခြင်းအား ရပ်ဆိုင်းပါ"</string>
-    <string name="bt_sm_2_1_nosdcard" msgid="1791835163301501637">"\"<xliff:g id="SENDER">%1$s</xliff:g>\" ထံမှ ဖိုင်ကိုသိမ်းရန် USB သိုလှောင်ခန်းတွင် နေရာမလုံလောက်ပါ"</string>
-    <string name="bt_sm_2_1_default" msgid="9115512207909504071">"\"<xliff:g id="SENDER">%1$s</xliff:g>\" ထံမှ ဖိုင်ကိုသိမ်းရန် SD ကတ်ထဲတွင် နေရာမလုံလောက်ပါ"</string>
+    <string name="bt_sm_2_1_nosdcard" msgid="5354343190503952837">"ဖိုင်သိမ်းရန် USB သိုလှောင်ခန်းတွင် နေရာမလောက်ပါ။"</string>
+    <string name="bt_sm_2_1_default" msgid="2497541206648973852">"ဖိုင်သိမ်းရန် SD ကတ်ပေါ်တွင် နေရာမလောက်ပါ။"</string>
     <string name="bt_sm_2_2" msgid="2965243265852680543">"လိုအပ်သော နေရာပမာဏ - <xliff:g id="SIZE">%1$s</xliff:g>"</string>
     <string name="ErrorTooManyRequests" msgid="8578277541472944529">"တောင်းခံမှုများစွာကို ပြုလုပ်နေသည်၊ ခဏနေ ပြန်ကြိုးစားကြည့်ပါ"</string>
     <string name="status_pending" msgid="2503691772030877944">"ဖိုင်လွှဲပြောင်းခြင်း မစရသေးပါ"</string>
