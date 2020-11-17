@@ -42,6 +42,7 @@ import android.bluetooth.BluetoothProtoEnums;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothCallback;
+import android.bluetooth.IBluetoothConnectionCallback;
 import android.bluetooth.IBluetoothMetadataListener;
 import android.bluetooth.IBluetoothSocketManager;
 import android.bluetooth.OobData;
@@ -113,7 +114,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AdapterService extends Service {
     private static final String TAG = "BluetoothAdapterService";
@@ -206,6 +209,7 @@ public class AdapterService extends Service {
     private final HashMap<BluetoothDevice, ArrayList<IBluetoothMetadataListener>>
             mMetadataListeners = new HashMap<>();
     private final HashMap<String, Integer> mProfileServicesState = new HashMap<String, Integer>();
+    private Set<IBluetoothConnectionCallback> mBluetoothConnectionCallbacks = new HashSet<>();
     //Only BluetoothManagerService should be registered
     private RemoteCallbackList<IBluetoothCallback> mCallbacks;
     private int mCurrentRequestId;
@@ -1944,6 +1948,30 @@ public class AdapterService extends Service {
         }
 
         @Override
+        public boolean registerBluetoothConnectionCallback(IBluetoothConnectionCallback callback) {
+            AdapterService service = getService();
+            if (service == null || !callerIsSystemOrActiveUser(TAG,
+                    "registerBluetoothConnectionCallback")) {
+                return false;
+            }
+            enforceBluetoothPrivilegedPermission(service);
+            service.mBluetoothConnectionCallbacks.add(callback);
+            return true;
+        }
+
+        @Override
+        public boolean unregisterBluetoothConnectionCallback(
+                IBluetoothConnectionCallback callback) {
+            AdapterService service = getService();
+            if (service == null || !callerIsSystemOrActiveUser(TAG,
+                    "unregisterBluetoothConnectionCallback")) {
+                return false;
+            }
+            enforceBluetoothPrivilegedPermission(service);
+            return service.mBluetoothConnectionCallbacks.remove(callback);
+        }
+
+        @Override
         public void registerCallback(IBluetoothCallback callback) {
             AdapterService service = getService();
             if (service == null || !callerIsSystemOrActiveUser(TAG, "registerCallback")) {
@@ -2644,6 +2672,10 @@ public class AdapterService extends Service {
         return deviceProp.getUuids();
     }
 
+    public Set<IBluetoothConnectionCallback> getBluetoothConnectionCallbacks() {
+        return mBluetoothConnectionCallbacks;
+    }
+
     void logUserBondResponse(BluetoothDevice device, boolean accepted, int event) {
         BluetoothStatsLog.write(BluetoothStatsLog.BLUETOOTH_BOND_STATE_CHANGED,
                 obfuscateAddress(device), 0, device.getType(),
@@ -3077,6 +3109,7 @@ public class AdapterService extends Service {
     private static final String GD_HCI_FLAG = "INIT_gd_hci";
     private static final String GD_CONTROLLER_FLAG = "INIT_gd_controller";
     private static final String GD_ACL_FLAG = "INIT_gd_acl";
+    private static final String GD_L2CAP_FLAG = "INIT_gd_l2cap";
     /**
      * Logging flags logic (only applies to DEBUG and VERBOSE levels):
      * if LOG_TAG in LOGGING_DEBUG_DISABLED_FOR_TAGS_FLAG:
@@ -3096,6 +3129,7 @@ public class AdapterService extends Service {
             "INIT_logging_debug_enabled_for_tags";
     private static final String LOGGING_DEBUG_DISABLED_FOR_TAGS_FLAG =
             "INIT_logging_debug_disabled_for_tags";
+    private static final String BTAA_HCI_LOG_FLAG = "INIT_btaa_hci";
 
     private String[] getInitFlags() {
         ArrayList<String> initFlags = new ArrayList<>();
@@ -3114,6 +3148,9 @@ public class AdapterService extends Service {
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_ACL_FLAG, false)) {
             initFlags.add(String.format("%s=%s", GD_ACL_FLAG, "true"));
         }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_L2CAP_FLAG, false)) {
+            initFlags.add(String.format("%s=%s", GD_L2CAP_FLAG, "true"));
+        }
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH,
                 LOGGING_DEBUG_ENABLED_FOR_ALL_FLAG, false)) {
             initFlags.add(String.format("%s=%s", LOGGING_DEBUG_ENABLED_FOR_ALL_FLAG, "true"));
@@ -3129,6 +3166,9 @@ public class AdapterService extends Service {
         if (!debugLoggingDisabledTags.isEmpty()) {
             initFlags.add(String.format("%s=%s", LOGGING_DEBUG_DISABLED_FOR_TAGS_FLAG,
                     debugLoggingDisabledTags));
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, BTAA_HCI_LOG_FLAG, false)) {
+            initFlags.add(BTAA_HCI_LOG_FLAG);
         }
         return initFlags.toArray(new String[0]);
     }
