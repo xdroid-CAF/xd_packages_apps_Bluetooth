@@ -167,6 +167,8 @@ public class AdapterService extends Service {
 
     private final ArrayList<DiscoveringPackage> mDiscoveringPackages = new ArrayList<>();
 
+    private static final int TYPE_BREDR = 100;
+
     static {
         classInitNative();
     }
@@ -1099,6 +1101,8 @@ public class AdapterService extends Service {
         public int setSocketOpt(int type, int port, int optionName, byte [] optionVal, int optionLen) { return -1; }
         @Override
         public int getSocketOpt(int type, int port, int optionName, byte [] optionVal) { return -1; }
+        @Override
+        public int getDeviceType(BluetoothDevice device) { return TYPE_BREDR; }
 
         public void cleanup() {
             mService = null;
