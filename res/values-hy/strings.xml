@@ -18,8 +18,8 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="permlab_bluetoothShareManager" msgid="311492132450338925">"Օգտվել ներբեռնման կառավարչից:"</string>
     <string name="permdesc_bluetoothShareManager" msgid="8930572979123190223">"Թույլ է տալիս, որ ծրագիրը մատչի BluetoothShare կառավարչին և այն օգտագործի ֆայլեր փոխանցելու համար:"</string>
-    <string name="permlab_bluetoothWhitelist" msgid="7091552898592306386">"Մուտք bluetooth սարքի ցուցակին:"</string>
-    <string name="permdesc_bluetoothWhitelist" msgid="5494513855192170109">"Թույլ է տալիս, որ ծրագիրը ժամանակավորապես մաքրի Bluetooth սարքի ցուցակը, ինչը թույլ է տալիս, որ այդ սարքը կարողանա ֆայլեր ուղարկել տվյալ սարքին առանց օգտատիրոջ հաստատման:"</string>
+    <string name="permlab_bluetoothAcceptlist" msgid="2647575807648622053">"Թույլատրված Bluetooth սարքի հասանելիություն։"</string>
+    <string name="permdesc_bluetoothAcceptlist" msgid="2406423665674766442">"Թույլատրում է հավելվածին ժամանակավորապես ավելացնել Bluetooth սարքը սպիտակ ցուցակում, ինչը հնարավորություն է տալիս, որ Bluetooth սարքը ֆայլեր ուղարկի այս սարքին՝ առանց օգտատիրոջ հաստատման։"</string>
     <string name="bt_share_picker_label" msgid="6268100924487046932">"Bluetooth"</string>
     <string name="unknown_device" msgid="9221903979877041009">"Անհայտ սարք"</string>
     <string name="unknownNumber" msgid="4994750948072751566">"Անհայտ"</string>
@@ -59,7 +59,7 @@
     <string name="download_fail_line1" msgid="3846450148862894552">"Ֆայլը չհաջողվեց ստանալ"</string>
     <string name="download_fail_line2" msgid="8950394574689971071">"Ֆայլ՝ <xliff:g id="FILE">%1$s</xliff:g>"</string>
     <string name="download_fail_line3" msgid="3451040656154861722">"Պատճառը՝ <xliff:g id="REASON">%1$s</xliff:g>"</string>
-    <string name="download_fail_ok" msgid="1521733664438320300">"Հաստատել"</string>
+    <string name="download_fail_ok" msgid="1521733664438320300">"Եղավ"</string>
     <string name="download_succ_line5" msgid="4509944688281573595">"Ֆայլը ստացվել է"</string>
     <string name="download_succ_ok" msgid="7053688246357050216">"Բացել"</string>
     <string name="upload_line1" msgid="2055952074059709052">"Ում՝ «<xliff:g id="RECIPIENT">%1$s</xliff:g>»"</string>

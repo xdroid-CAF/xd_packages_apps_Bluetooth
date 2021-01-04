@@ -700,14 +700,14 @@ public class GattService extends ProfileService {
         @Override
         public void leConnectionUpdate(int clientIf, String address,
                 int minConnectionInterval, int maxConnectionInterval,
-                int slaveLatency, int supervisionTimeout,
+                int peripheralLatency, int supervisionTimeout,
                 int minConnectionEventLen, int maxConnectionEventLen) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
             service.leConnectionUpdate(clientIf, address, minConnectionInterval,
-                                       maxConnectionInterval, slaveLatency,
+                                       maxConnectionInterval, peripheralLatency,
                                        supervisionTimeout, minConnectionEventLen,
                                        maxConnectionEventLen);
         }
@@ -1302,6 +1302,24 @@ public class GattService extends ProfileService {
         }
 
         app.callback.onConnectionUpdated(address, interval, latency, timeout, status);
+    }
+
+    void onServiceChanged(int connId) throws RemoteException {
+        if (DBG) {
+            Log.d(TAG, "onServiceChanged - connId=" + connId);
+        }
+
+        String address = mClientMap.addressByConnId(connId);
+        if (address == null) {
+            return;
+        }
+
+        ClientMap.App app = mClientMap.getByConnId(connId);
+        if (app == null) {
+            return;
+        }
+
+        app.callback.onServiceChanged(address);
     }
 
     void onServerPhyUpdate(int connId, int txPhy, int rxPhy, int status) throws RemoteException {
@@ -2621,7 +2639,7 @@ public class GattService extends ProfileService {
         int minInterval;
         int maxInterval;
 
-        // Slave latency
+        // Peripheral latency
         int latency;
 
         // Link supervision timeout is measured in N * 10ms
@@ -2659,21 +2677,21 @@ public class GattService extends ProfileService {
     }
 
     void leConnectionUpdate(int clientIf, String address, int minInterval,
-                            int maxInterval, int slaveLatency,
+                            int maxInterval, int peripheralLatency,
                             int supervisionTimeout, int minConnectionEventLen,
                             int maxConnectionEventLen) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) {
             Log.d(TAG, "leConnectionUpdate() - address=" + address + ", intervals="
-                        + minInterval + "/" + maxInterval + ", latency=" + slaveLatency
+                        + minInterval + "/" + maxInterval + ", latency=" + peripheralLatency
                         + ", timeout=" + supervisionTimeout + "msec" + ", min_ce="
                         + minConnectionEventLen + ", max_ce=" + maxConnectionEventLen);
 
 
         }
         gattConnectionParameterUpdateNative(clientIf, address, minInterval, maxInterval,
-                                            slaveLatency, supervisionTimeout,
+                                            peripheralLatency, supervisionTimeout,
                                             minConnectionEventLen, maxConnectionEventLen);
     }
 

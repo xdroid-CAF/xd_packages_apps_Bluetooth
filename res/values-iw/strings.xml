@@ -18,8 +18,8 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="permlab_bluetoothShareManager" msgid="311492132450338925">"גישה למנהל ההורדות."</string>
     <string name="permdesc_bluetoothShareManager" msgid="8930572979123190223">"‏מאפשר לאפליקציה לגשת למנהל BluetoothShare ולהשתמש בו להעברת קבצים."</string>
-    <string name="permlab_bluetoothWhitelist" msgid="7091552898592306386">"‏הכנס מכשיר Bluetooth לרשימה הלבנה."</string>
-    <string name="permdesc_bluetoothWhitelist" msgid="5494513855192170109">"‏מאפשר לאפליקציה להכניס מכשיר Bluetooth באופן זמני לרשימה הלבנה, ובכך לאפשר למכשיר לשלוח קבצים למכשיר זה ללא אישור משתמש."</string>
+    <string name="permlab_bluetoothAcceptlist" msgid="2647575807648622053">"‏גישה לרשימת ההיתרים של מכשיר Bluetooth."</string>
+    <string name="permdesc_bluetoothAcceptlist" msgid="2406423665674766442">"‏התכונה הזו מאפשרת לאפליקציה להוסיף מכשיר Bluetooth לרשימת ההיתרים באופן זמני, ובכך לאפשר לאותו מכשיר לשלוח קבצים למכשיר זה ללא אישור משתמש."</string>
     <string name="bt_share_picker_label" msgid="6268100924487046932">"Bluetooth"</string>
     <string name="unknown_device" msgid="9221903979877041009">"מכשיר לא ידוע"</string>
     <string name="unknownNumber" msgid="4994750948072751566">"לא ידוע"</string>
@@ -69,7 +69,7 @@
     <string name="upload_succ_ok" msgid="7705428476405478828">"אישור"</string>
     <string name="upload_fail_line1" msgid="7899394672421491701">"הקובץ לא נשלח אל <xliff:g id="RECIPIENT">%1$s</xliff:g>."</string>
     <string name="upload_fail_line1_2" msgid="2108129204050841798">"קובץ: <xliff:g id="FILE">%1$s</xliff:g>"</string>
-    <string name="upload_fail_cancel" msgid="9118496285835687125">"סגור"</string>
+    <string name="upload_fail_cancel" msgid="9118496285835687125">"סגירה"</string>
     <string name="bt_error_btn_ok" msgid="5965151173011534240">"אישור"</string>
     <string name="unknown_file" msgid="6092727753965095366">"קובץ לא ידוע"</string>
     <string name="unknown_file_desc" msgid="480434281415453287">"אין אפליקציה המתאימה לטיפול בקבצים מסוג זה. \n"</string>
