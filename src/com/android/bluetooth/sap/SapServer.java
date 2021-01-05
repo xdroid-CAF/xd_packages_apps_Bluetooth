@@ -754,8 +754,10 @@ public class SapServer extends Thread implements Callback {
             sapDisconnectIntent.putExtra(SAP_DISCONNECT_TYPE_EXTRA, discType);
             AlarmManager alarmManager =
                     (AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
+            // TODO(b/171825892) Please replace FLAG_MUTABLE_UNAUDITED below
+            // with either FLAG_IMMUTABLE (recommended) or FLAG_MUTABLE.
             mPendingDiscIntent = PendingIntent.getBroadcast(mContext, discType, sapDisconnectIntent,
-                    PendingIntent.FLAG_CANCEL_CURRENT);
+                    PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE_UNAUDITED);
             alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     SystemClock.elapsedRealtime() + timeMs, mPendingDiscIntent);
 

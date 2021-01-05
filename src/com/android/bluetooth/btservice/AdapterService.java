@@ -2877,8 +2877,11 @@ public class AdapterService extends Service {
                     : AlarmManager.ELAPSED_REALTIME;
 
             Intent intent = new Intent(ACTION_ALARM_WAKEUP);
+            // TODO(b/171825892) Please replace FLAG_MUTABLE_UNAUDITED below
+            // with either FLAG_IMMUTABLE (recommended) or FLAG_MUTABLE.
             mPendingAlarm =
-                    PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+                    PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_ONE_SHOT
+                            | PendingIntent.FLAG_MUTABLE_UNAUDITED);
             mAlarmManager.setExact(type, wakeupTime, mPendingAlarm);
             return true;
         }
@@ -3118,6 +3121,7 @@ public class AdapterService extends Service {
     // Boolean flags
     private static final String GD_CORE_FLAG = "INIT_gd_core";
     private static final String GD_ADVERTISING_FLAG = "INIT_gd_advertising";
+    private static final String GD_SCANNING_FLAG = "INIT_gd_scanning";
     private static final String GD_HCI_FLAG = "INIT_gd_hci";
     private static final String GD_CONTROLLER_FLAG = "INIT_gd_controller";
     private static final String GD_ACL_FLAG = "INIT_gd_acl";
@@ -3151,6 +3155,9 @@ public class AdapterService extends Service {
         }
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_ADVERTISING_FLAG, false)) {
             initFlags.add(String.format("%s=%s", GD_ADVERTISING_FLAG, "true"));
+        }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_SCANNING_FLAG, false)) {
+            initFlags.add(String.format("%s=%s", GD_SCANNING_FLAG, "true"));
         }
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_HCI_FLAG, false)) {
             initFlags.add(String.format("%s=%s", GD_HCI_FLAG, "true"));
