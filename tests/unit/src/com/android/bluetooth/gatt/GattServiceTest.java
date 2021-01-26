@@ -89,5 +89,4 @@ public class GattServiceTest {
         });
         Assert.assertEquals(99700000000L, timestampNanos);
     }
-
 }
