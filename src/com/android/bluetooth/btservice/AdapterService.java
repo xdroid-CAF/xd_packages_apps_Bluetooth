@@ -32,6 +32,7 @@ import android.app.AppOpsManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.app.admin.DevicePolicyManager;
+import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothActivityEnergyInfo;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.ActiveDeviceUse;
@@ -40,6 +41,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProtoEnums;
 import android.bluetooth.BluetoothUuid;
+import android.bluetooth.BufferConstraints;
 import android.bluetooth.IBluetooth;
 import android.bluetooth.IBluetoothCallback;
 import android.bluetooth.IBluetoothConnectionCallback;
@@ -2886,7 +2888,7 @@ public class AdapterService extends Service {
             // with either FLAG_IMMUTABLE (recommended) or FLAG_MUTABLE.
             mPendingAlarm =
                     PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_ONE_SHOT
-                            | PendingIntent.FLAG_MUTABLE_UNAUDITED);
+                            | PendingIntent.FLAG_IMMUTABLE);
             mAlarmManager.setExact(type, wakeupTime, mPendingAlarm);
             return true;
         }
@@ -3132,6 +3134,8 @@ public class AdapterService extends Service {
     private static final String GD_ACL_FLAG = "INIT_gd_acl";
     private static final String GD_L2CAP_FLAG = "INIT_gd_l2cap";
     private static final String GD_RUST_FLAG = "INIT_gd_rust";
+    private static final String GD_LINK_POLICY_FLAG = "INIT_gd_link_policy";
+
     /**
      * Logging flags logic (only applies to DEBUG and VERBOSE levels):
      * if LOG_TAG in LOGGING_DEBUG_DISABLED_FOR_TAGS_FLAG:
@@ -3179,6 +3183,9 @@ public class AdapterService extends Service {
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_RUST_FLAG, false)) {
             initFlags.add(String.format("%s=%s", GD_RUST_FLAG, "true"));
         }
+        if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH, GD_LINK_POLICY_FLAG, false)) {
+            initFlags.add(String.format("%s=%s", GD_LINK_POLICY_FLAG, "true"));
+        }
         if (DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_BLUETOOTH,
                 LOGGING_DEBUG_ENABLED_FOR_ALL_FLAG, false)) {
             initFlags.add(String.format("%s=%s", LOGGING_DEBUG_ENABLED_FOR_ALL_FLAG, "true"));
@@ -3213,6 +3220,38 @@ public class AdapterService extends Service {
             return new byte[0];
         }
         return obfuscateAddressNative(Utils.getByteAddress(device));
+    }
+
+    /**
+     * Get dynamic audio buffer size supported type
+     *
+     * @return support <p>Possible values are
+     * {@link BluetoothA2dp#DYNAMIC_BUFFER_SUPPORT_NONE},
+     * {@link BluetoothA2dp#DYNAMIC_BUFFER_SUPPORT_A2DP_OFFLOAD},
+     * {@link BluetoothA2dp#DYNAMIC_BUFFER_SUPPORT_A2DP_SOFTWARE_ENCODING}.
+     */
+    public int getDynamicBufferSupport() {
+        return mAdapterProperties.getDynamicBufferSupport();
+    }
+
+    /**
+     * Get dynamic audio buffer size
+     *
+     * @return BufferConstraints
+     */
+    public BufferConstraints getBufferConstraints() {
+        return mAdapterProperties.getBufferConstraints();
+    }
+
+    /**
+     * Set dynamic audio buffer size
+     *
+     * @param codec Audio codec
+     * @param value buffer millis
+     * @return true if the settings is successful, false otherwise
+     */
+    public boolean setBufferMillis(int codec, int value) {
+        return mAdapterProperties.setBufferMillis(codec, value);
     }
 
     /**
@@ -3307,6 +3346,8 @@ public class AdapterService extends Service {
     private native void interopDatabaseAddNative(int feature, byte[] address, int length);
 
     private native byte[] obfuscateAddressNative(byte[] address);
+
+    native boolean setBufferMillisNative(int codec, int value);
 
     private native int getMetricIdNative(byte[] address);
 
