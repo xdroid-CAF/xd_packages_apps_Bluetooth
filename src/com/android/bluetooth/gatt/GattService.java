@@ -89,6 +89,8 @@ public class GattService extends ProfileService {
     private static final boolean DBG = GattServiceConfig.DBG;
     private static final boolean VDBG = GattServiceConfig.VDBG;
     private static final String TAG = GattServiceConfig.TAG_PREFIX + "GattService";
+    private static final String UUID_SUFFIX = "-0000-1000-8000-00805f9b34fb";
+    private static final String UUID_ZERO_PAD = "00000000";
 
     static final int SCAN_FILTER_ENABLED = 1;
     static final int SCAN_FILTER_MODIFIED = 2;
@@ -440,13 +442,12 @@ public class GattService extends ProfileService {
         }
 
         @Override
-        public void registerClient(ParcelUuid uuid, IBluetoothGattCallback callback,
-                boolean eattSupport) {
+        public void registerClient(ParcelUuid uuid, IBluetoothGattCallback callback, boolean eatt_support) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.registerClient(uuid.getUuid(), callback, eattSupport);
+            service.registerClient(uuid.getUuid(), callback, eatt_support);
         }
 
         @Override
@@ -715,12 +716,12 @@ public class GattService extends ProfileService {
 
         @Override
         public void registerServer(ParcelUuid uuid, IBluetoothGattServerCallback callback,
-                boolean eattSupport) {
+                                   boolean eatt_support) {
             GattService service = getService();
             if (service == null) {
                 return;
             }
-            service.registerServer(uuid.getUuid(), callback, eattSupport);
+            service.registerServer(uuid.getUuid(), callback, eatt_support);
         }
 
         @Override
@@ -1046,27 +1047,10 @@ public class GattService extends ProfileService {
                     + Integer.toHexString(advertisingSid) + ", txPower=" + txPower + ", rssi="
                     + rssi + ", periodicAdvInt=0x" + Integer.toHexString(periodicAdvInt));
         }
-        List<UUID> remoteUuids = parseUuids(advData);
 
         byte[] legacyAdvData = Arrays.copyOfRange(advData, 0, 62);
 
         for (ScanClient client : mScanManager.getRegularScanQueue()) {
-            if (client.uuids.length > 0) {
-                int matches = 0;
-                for (UUID search : client.uuids) {
-                    for (UUID remote : remoteUuids) {
-                        if (remote.equals(search)) {
-                            ++matches;
-                            break; // Only count 1st match in case of duplicates
-                        }
-                    }
-                }
-
-                if (matches < client.uuids.length) {
-                    continue;
-                }
-            }
-
             ScannerMap.App app = mScannerMap.getById(client.scannerId);
             if (app == null) {
                 continue;
@@ -2399,16 +2383,14 @@ public class GattService extends ProfileService {
      * GATT Service functions - CLIENT
      *************************************************************************/
 
-    void registerClient(UUID uuid, IBluetoothGattCallback callback,
-            boolean eattSupport) {
+    void registerClient(UUID uuid, IBluetoothGattCallback callback, boolean eatt_support) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) {
             Log.d(TAG, "registerClient() - UUID=" + uuid);
         }
         mClientMap.add(uuid, null, callback, null, this);
-        gattClientRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(),
-                                    eattSupport);
+        gattClientRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(), eatt_support);
     }
 
     void unregisterClient(int clientIf) {
@@ -3066,15 +3048,14 @@ public class GattService extends ProfileService {
      * GATT Service functions - SERVER
      *************************************************************************/
 
-    void registerServer(UUID uuid, IBluetoothGattServerCallback callback, boolean eattSupport) {
+    void registerServer(UUID uuid, IBluetoothGattServerCallback callback, boolean eatt_support) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
 
         if (DBG) {
             Log.d(TAG, "registerServer() - UUID=" + uuid);
         }
         mServerMap.add(uuid, null, callback, null, this);
-        gattServerRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(),
-                                    eattSupport);
+        gattServerRegisterAppNative(uuid.getLeastSignificantBits(), uuid.getMostSignificantBits(), eatt_support);
     }
 
     void unregisterServer(int serverIf) {
@@ -3361,38 +3342,6 @@ public class GattService extends ProfileService {
         }
     }
 
-    private List<UUID> parseUuids(byte[] advData) {
-        List<UUID> uuids = new ArrayList<UUID>();
-
-        int offset = 0;
-        while (offset < (advData.length - 2)) {
-            int len = Byte.toUnsignedInt(advData[offset++]);
-            if (len == 0) {
-                break;
-            }
-
-            int type = advData[offset++];
-            switch (type) {
-                case 0x02: // Partial list of 16-bit UUIDs
-                case 0x03: // Complete list of 16-bit UUIDs
-                    while (len > 1) {
-                        int uuid16 = advData[offset++];
-                        uuid16 += (advData[offset++] << 8);
-                        len -= 2;
-                        uuids.add(UUID.fromString(
-                                String.format("%08x-0000-1000-8000-00805f9b34fb", uuid16)));
-                    }
-                    break;
-
-                default:
-                    offset += (len - 1);
-                    break;
-            }
-        }
-
-        return uuids;
-    }
-
     void dumpRegisterId(StringBuilder sb) {
         sb.append("  Scanner:\n");
         for (Integer appId : mScannerMap.getAllAppsIds()) {
@@ -3483,8 +3432,7 @@ public class GattService extends ProfileService {
 
     private native int gattClientGetDeviceTypeNative(String address);
 
-    private native void gattClientRegisterAppNative(long appUuidLsb, long appUuidMsb,
-            boolean eattSupport);
+    private native void gattClientRegisterAppNative(long appUuidLsb, long appUuidMsb, boolean eatt_support);
 
     private native void gattClientUnregisterAppNative(int clientIf);
 
@@ -3534,8 +3482,7 @@ public class GattService extends ProfileService {
             int minInterval, int maxInterval, int latency, int timeout, int minConnectionEventLen,
             int maxConnectionEventLen);
 
-    private native void gattServerRegisterAppNative(long appUuidLsb, long appUuidMsb,
-            boolean eattSupport);
+    private native void gattServerRegisterAppNative(long appUuidLsb, long appUuidMsb, boolean eatt_support);
 
     private native void gattServerUnregisterAppNative(int serverIf);
 
