@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.bluetooth.hfp;
+package com.android.bluetooth.telephony;
 
 import android.net.Uri;
 import android.os.Bundle;
@@ -269,7 +269,8 @@ public class BluetoothCall {
 
     // helper functions
     public boolean isSilentRingingRequested() {
-        return getDetails().getExtras().getBoolean(Call.EXTRA_SILENT_RINGING_REQUESTED);
+        return getDetails().getExtras() != null
+                && getDetails().getExtras().getBoolean(Call.EXTRA_SILENT_RINGING_REQUESTED);
     }
 
     public boolean isConference() {
