@@ -287,7 +287,7 @@ static void bond_state_changed_callback(bt_status_t status, RawAddress* bd_addr,
 }
 
 static void acl_state_changed_callback(bt_status_t status, RawAddress* bd_addr,
-                                       bt_acl_state_t state) {
+                                       bt_acl_state_t state, bt_hci_error_code_t hci_reason) {
   if (!bd_addr) {
     ALOGE("Address is null in %s", __func__);
     return;
@@ -306,7 +306,7 @@ static void acl_state_changed_callback(bt_status_t status, RawAddress* bd_addr,
                                    (jbyte*)bd_addr);
 
   sCallbackEnv->CallVoidMethod(sJniCallbacksObj, method_aclStateChangeCallback,
-                               (jint)status, addr.get(), (jint)state);
+                               (jint)status, addr.get(), (jint)state, (jint)hci_reason);
 }
 
 static void discovery_state_changed_callback(bt_discovery_state_t state) {
@@ -681,7 +681,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
       env->GetMethodID(jniCallbackClass, "bondStateChangeCallback", "(I[BI)V");
 
   method_aclStateChangeCallback =
-      env->GetMethodID(jniCallbackClass, "aclStateChangeCallback", "(I[BI)V");
+      env->GetMethodID(jniCallbackClass, "aclStateChangeCallback", "(I[BII)V");
 
   method_linkQualityReportCallback = env->GetMethodID(
       jniCallbackClass, "linkQualityReportCallback", "(JIIIIII)V");
@@ -704,7 +704,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 }
 
 static bool initNative(JNIEnv* env, jobject obj, jboolean isGuest,
-                       jboolean isNiapMode, int configCompareResult,
+                       jboolean isCommonCriteriaMode, int configCompareResult,
                        jobjectArray initFlags, jboolean isAtvDevice) {
   ALOGV("%s", __func__);
 
@@ -734,7 +734,7 @@ static bool initNative(JNIEnv* env, jobject obj, jboolean isGuest,
 
   int ret = sBluetoothInterface->init(
       &sBluetoothCallbacks, isGuest == JNI_TRUE ? 1 : 0,
-      isNiapMode == JNI_TRUE ? 1 : 0, configCompareResult, flags,
+      isCommonCriteriaMode == JNI_TRUE ? 1 : 0, configCompareResult, flags,
       isAtvDevice == JNI_TRUE ? 1 : 0);
 
   for (int i = 0; i < flagCount; i++) {
@@ -1262,8 +1262,8 @@ static jbyteArray obfuscateAddressNative(JNIEnv* env, jobject obj,
   return output_bytes;
 }
 
-static jboolean setBufferMillisNative(JNIEnv* env, jobject obj, jint codec,
-                                      jint size) {
+static jboolean setBufferLengthMillisNative(JNIEnv* env, jobject obj,
+                                            jint codec, jint size) {
   ALOGV("%s", __func__);
 
   if (!sBluetoothInterface) return JNI_FALSE;
@@ -1398,7 +1398,8 @@ static JNINativeMethod sMethods[] = {
     {"interopDatabaseClearNative", "()V", (void*)interopDatabaseClearNative},
     {"interopDatabaseAddNative", "(I[BI)V", (void*)interopDatabaseAddNative},
     {"obfuscateAddressNative", "([B)[B", (void*)obfuscateAddressNative},
-    {"setBufferMillisNative", "(II)Z", (void*)setBufferMillisNative},
+    {"setBufferLengthMillisNative", "(II)Z",
+     (void*)setBufferLengthMillisNative},
     {"getMetricIdNative", "([B)I", (void*)getMetricIdNative},
     {"connectSocketNative", "([BI[BIII)I", (void*)connectSocketNative},
     {"createSocketChannelNative", "(ILjava/lang/String;[BIII)I",
