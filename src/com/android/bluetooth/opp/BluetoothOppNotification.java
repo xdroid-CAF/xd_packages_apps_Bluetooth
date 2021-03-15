@@ -528,7 +528,6 @@ class BluetoothOppNotification {
                                             com.android.internal.R.color
                                                     .system_notification_accent_color,
                                             mContext.getTheme()))
-                          
                             .setContentIntent(
                                     PendingIntent.getBroadcast(mContext, 0, contentIntent,
                                         PendingIntent.FLAG_IMMUTABLE))
