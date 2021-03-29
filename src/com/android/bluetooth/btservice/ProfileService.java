@@ -16,6 +16,8 @@
 
 package com.android.bluetooth.btservice;
 
+import static android.Manifest.permission.BLUETOOTH_CONNECT;
+
 import android.app.ActivityManager;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -39,8 +41,6 @@ import com.android.bluetooth.Utils;
 public abstract class ProfileService extends Service {
     private static final boolean DBG = false;
 
-    public static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
-    public static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
     public static final String BLUETOOTH_PRIVILEGED =
             android.Manifest.permission.BLUETOOTH_PRIVILEGED;
 
@@ -60,6 +60,7 @@ public abstract class ProfileService extends Service {
     private AdapterService mAdapterService;
     private BroadcastReceiver mUserSwitchedReceiver;
     private boolean mProfileStarted = false;
+    private boolean mTestModeEnabled = false;
 
     public String getName() {
         return getClass().getSimpleName();
@@ -67,6 +68,10 @@ public abstract class ProfileService extends Service {
 
     protected boolean isAvailable() {
         return mProfileStarted;
+    }
+
+    protected boolean isTestModeEnabled() {
+        return mTestModeEnabled;
     }
 
     /**
@@ -110,6 +115,13 @@ public abstract class ProfileService extends Service {
      */
     protected void setUserUnlocked(int userId) {}
 
+    /**
+     * @param testEnabled if the profile should enter or exit a testing mode
+     */
+    protected void setTestModeEnabled(boolean testModeEnabled) {
+        mTestModeEnabled = testModeEnabled;
+    }
+
     protected ProfileService() {
         mName = getName();
     }
@@ -131,7 +143,7 @@ public abstract class ProfileService extends Service {
             Log.d(mName, "onStartCommand()");
         }
 
-        if (checkCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM)
+        if (checkCallingOrSelfPermission(BLUETOOTH_CONNECT)
                 != PackageManager.PERMISSION_GRANTED) {
             Log.e(mName, "Permission denied!");
             return PROFILE_SERVICE_MODE;
@@ -228,6 +240,10 @@ public abstract class ProfileService extends Service {
             Log.w(mName, "Could not add this profile because AdapterService is null.");
             return;
         }
+        if (!mAdapterService.isStartedProfile(mName)) {
+            Log.w(mName, "Unexpectedly do Start, don't start");
+            return;
+        }
         mAdapterService.addProfile(this);
 
         IntentFilter filter = new IntentFilter();
@@ -269,6 +285,10 @@ public abstract class ProfileService extends Service {
     }
 
     private void doStop() {
+        if (mAdapterService == null || mAdapterService.isStartedProfile(mName)) {
+            Log.w(mName, "Unexpectedly do Stop, don't stop.");
+            return;
+        }
         if (!mProfileStarted) {
             Log.w(mName, "doStop() called, but the profile is not running.");
         }
