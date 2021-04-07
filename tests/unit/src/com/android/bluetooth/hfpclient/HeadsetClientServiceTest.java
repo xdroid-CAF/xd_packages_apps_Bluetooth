@@ -17,6 +17,7 @@
 package com.android.bluetooth.hfpclient;
 
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.timeout;
@@ -72,6 +73,7 @@ public class HeadsetClientServiceTest {
         MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         TestUtils.startService(mServiceRule, HeadsetClientService.class);
         // At this point the service should have started so check NOT null
         mService = HeadsetClientService.getHeadsetClientService();

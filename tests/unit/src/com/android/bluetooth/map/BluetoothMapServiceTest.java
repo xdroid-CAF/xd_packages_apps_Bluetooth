@@ -15,6 +15,7 @@
  */
 package com.android.bluetooth.map;
 
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 
 import android.bluetooth.BluetoothAdapter;
@@ -60,6 +61,7 @@ public class BluetoothMapServiceTest {
         MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         TestUtils.startService(mServiceRule, BluetoothMapService.class);
         mService = BluetoothMapService.getBluetoothMapService();
         Assert.assertNotNull(mService);
