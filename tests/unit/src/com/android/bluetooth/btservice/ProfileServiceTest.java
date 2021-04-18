@@ -54,6 +54,11 @@ public class ProfileServiceTest {
     @Rule public final ServiceTestRule mServiceTestRule = new ServiceTestRule();
 
     private void setProfileState(Class profile, int state) throws TimeoutException {
+        if (state == BluetoothAdapter.STATE_ON) {
+            when(mMockAdapterService.isStartedProfile(anyString())).thenReturn(true);
+        } else if (state == BluetoothAdapter.STATE_OFF) {
+            when(mMockAdapterService.isStartedProfile(anyString())).thenReturn(false);
+        }
         Intent startIntent = new Intent(InstrumentationRegistry.getTargetContext(), profile);
         startIntent.putExtra(AdapterService.EXTRA_ACTION,
                 AdapterService.ACTION_SERVICE_STATE_CHANGED);
@@ -98,8 +103,9 @@ public class ProfileServiceTest {
 
         mProfiles = Config.getSupportedProfiles();
 
-        mMockAdapterService.initNative(false /* is_restricted */, false /* is_niap_mode */,
-                0 /* config_compare_result */, new String[0], false);
+        mMockAdapterService.initNative(false /* is_restricted */,
+                false /* is_common_criteria_mode */, 0 /* config_compare_result */,
+                new String[0], false);
 
         TestUtils.setAdapterService(mMockAdapterService);
         doReturn(mDatabaseManager).when(mMockAdapterService).getDatabase();

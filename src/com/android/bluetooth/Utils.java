@@ -16,14 +16,24 @@
 
 package com.android.bluetooth;
 
+import static android.Manifest.permission.BLUETOOTH_CONNECT;
+import static android.Manifest.permission.BLUETOOTH_SCAN;
+import static android.content.PermissionChecker.PERMISSION_HARD_DENIED;
+import static android.content.pm.PackageManager.GET_PERMISSIONS;
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AppOpsManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.companion.Association;
+import android.companion.CompanionDeviceManager;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.ContextWrapper;
+import android.content.PermissionChecker;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
 import android.location.LocationManager;
@@ -285,16 +295,69 @@ public final class Utils {
         Utils.sForegroundUserId = uid;
     }
 
-    public static void enforceBluetoothPermission(Context context) {
-        context.enforceCallingOrSelfPermission(
-                android.Manifest.permission.BLUETOOTH,
-                "Need BLUETOOTH permission");
+    /**
+     * Enforces that a Companion Device Manager (CDM) association exists between the calling
+     * application and the Bluetooth Device.
+     *
+     * @param cdm the CompanionDeviceManager object
+     * @param context the Bluetooth AdapterService context
+     * @param callingPackage the calling package
+     * @param callingUid the calling app uid
+     * @param device the remote BluetoothDevice
+     * @return {@code true} if there is a CDM association
+     * @throws SecurityException if the package name does not match the uid or the association
+     *                           doesn't exist
+     */
+    public static boolean enforceCdmAssociation(CompanionDeviceManager cdm, Context context,
+            String callingPackage, int callingUid, BluetoothDevice device) {
+        if (!isPackageNameAccurate(context, callingPackage, callingUid)) {
+            throw new SecurityException("hasCdmAssociation: Package name " + callingPackage
+                    + " is inaccurate for calling uid " + callingUid);
+        }
+
+        for (Association association : cdm.getAllAssociations()) {
+            if (association.getPackageName().equals(callingPackage)
+                    && association.getDeviceMacAddress().equals(device.getAddress())) {
+                return true;
+            }
+        }
+        throw new SecurityException("The application with package name " + callingPackage
+                + " does not have a CDM association with the Bluetooth Device");
     }
 
-    public static void enforceBluetoothAdminPermission(Context context) {
-        context.enforceCallingOrSelfPermission(
-                android.Manifest.permission.BLUETOOTH_ADMIN,
-                "Need BLUETOOTH ADMIN permission");
+    /**
+     * Verifies whether the calling package name matches the calling app uid
+     * @param context the Bluetooth AdapterService context
+     * @param callingPackage the calling application package name
+     * @param callingUid the calling application uid
+     * @return {@code true} if the package name matches the calling app uid, {@code false} otherwise
+     */
+    public static boolean isPackageNameAccurate(Context context, String callingPackage,
+            int callingUid) {
+        // Verifies the integrity of the calling package name
+        try {
+            int packageUid = context.getPackageManager().getPackageUid(callingPackage, 0);
+            if (packageUid != callingUid) {
+                return false;
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.e(TAG, "isPackageNameAccurate: App with package name " + callingPackage
+                    + " does not exist");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Checks whether the caller has the BLUETOOTH_PRIVILEGED permission
+     *
+     * @param context the Bluetooth AdapterService context
+     * @return {@code true} if the caller has the BLUETOOTH_PRIVILEGED permission, {@code false}
+     *         otherwise
+     */
+    public static boolean hasBluetoothPrivilegedPermission(Context context) {
+        return context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_PRIVILEGED)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     public static void enforceBluetoothPrivilegedPermission(Context context) {
@@ -313,6 +376,97 @@ public final class Utils {
         context.enforceCallingOrSelfPermission(
                 android.Manifest.permission.DUMP,
                 "Need DUMP permission");
+    }
+
+    /**
+     * Returns true if the BLUETOOTH_CONNECT permission is granted for the calling app. Returns
+     * false if the result is a soft denial. Throws SecurityException if the result is a hard
+     * denial.
+     *
+     * <p>Should be used in situations where the app op should not be noted.
+     */
+    public static boolean checkConnectPermissionForPreflight(Context context) {
+        int permissionCheckResult = PermissionChecker.checkCallingOrSelfPermissionForPreflight(
+                context, BLUETOOTH_CONNECT);
+        if (permissionCheckResult == PERMISSION_HARD_DENIED) {
+            throw new SecurityException("Need BLUETOOTH_CONNECT permission");
+        }
+        return permissionCheckResult == PERMISSION_GRANTED;
+    }
+
+    /**
+     * Returns true if the BLUETOOTH_CONNECT permission is granted for the calling app. Returns
+     * false if the result is a soft denial. Throws SecurityException if the result is a hard
+     * denial.
+     *
+     * <p>Should be used in situations where data will be delivered and hence the app op should
+     * be noted.
+     */
+    public static boolean checkConnectPermissionForDataDelivery(
+            Context context, String callingPackage, String callingAttributionTag, String message) {
+        int permissionCheckResult = PermissionChecker.checkCallingOrSelfPermissionForDataDelivery(
+                context, BLUETOOTH_CONNECT, callingPackage, callingAttributionTag, message);
+        if (permissionCheckResult == PERMISSION_HARD_DENIED) {
+            throw new SecurityException("Need BLUETOOTH_CONNECT permission");
+        }
+        return permissionCheckResult == PERMISSION_GRANTED;
+    }
+
+    /**
+     * Returns true if the BLUETOOTH_SCAN permission is granted for the calling app. Returns false
+     * if the result is a soft denial. Throws SecurityException if the result is a hard denial.
+     *
+     * <p>Should be used in situations where the app op should not be noted.
+     */
+    public static boolean checkScanPermissionForPreflight(Context context) {
+        int permissionCheckResult = PermissionChecker.checkCallingOrSelfPermissionForPreflight(
+                context, BLUETOOTH_SCAN);
+        if (permissionCheckResult == PERMISSION_HARD_DENIED) {
+            throw new SecurityException("Need BLUETOOTH_SCAN permission");
+        }
+        return permissionCheckResult == PERMISSION_GRANTED;
+    }
+
+    /**
+     * Returns true if the BLUETOOTH_SCAN permission is granted for the calling app. Returns false
+     * if the result is a soft denial. Throws SecurityException if the result is a hard denial.
+     *
+     * <p>Should be used in situations where data will be delivered and hence the app op should
+     * be noted.
+     */
+    public static boolean checkScanPermissionForDataDelivery(
+            Context context, String callingPackage, String callingAttributionTag, String message) {
+        int permissionCheckResult = PermissionChecker.checkCallingOrSelfPermissionForDataDelivery(
+                context, BLUETOOTH_SCAN, callingPackage, callingAttributionTag, message);
+        if (permissionCheckResult == PERMISSION_HARD_DENIED) {
+            throw new SecurityException("Need BLUETOOTH_SCAN permission");
+        }
+        return permissionCheckResult == PERMISSION_GRANTED;
+    }
+
+    /**
+     * Returns true if the specified package has disavowed the use of bluetooth scans for location,
+     * that is, if they have specified the {@code neverForLocation} flag on the BLUETOOTH_SCAN
+     * permission.
+     */
+    public static boolean hasDisavowedLocationForScan(Context context, String packageName) {
+
+        // TODO(b/183203469): Check PermissionIdentity to include dynamic disavowal cases.
+
+        PackageManager pm = context.getPackageManager();
+        try {
+            // TODO(b/183478032): Cache PackageInfo for use here.
+            PackageInfo pkgInfo = pm.getPackageInfo(packageName, GET_PERMISSIONS);
+            for (int i = 0; i < pkgInfo.requestedPermissions.length; i++) {
+                if (pkgInfo.requestedPermissions[i].equals(BLUETOOTH_SCAN)) {
+                    return (pkgInfo.requestedPermissionsFlags[i]
+                            & PackageInfo.REQUESTED_PERMISSION_NEVER_FOR_LOCATION) != 0;
+                }
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Could not find package for disavowal check: " + packageName);
+        }
+        return false;
     }
 
     public static boolean callerIsSystemOrActiveUser(String tag, String method) {
@@ -363,18 +517,6 @@ public final class Utils {
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
-    }
-
-    /**
-     * Enforce the context has android.Manifest.permission.BLUETOOTH_ADMIN permission. A
-     * {@link SecurityException} would be thrown if neither the calling process or the application
-     * does not have BLUETOOTH_ADMIN permission.
-     *
-     * @param context Context for the permission check.
-     */
-    public static void enforceAdminPermission(ContextWrapper context) {
-        context.enforceCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH_ADMIN,
-                "Need BLUETOOTH_ADMIN permission");
     }
 
     /**

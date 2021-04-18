@@ -15,6 +15,7 @@
  */
 package com.android.bluetooth.pan;
 
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
@@ -64,6 +65,7 @@ public class PanServiceTest {
         MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         TestUtils.startService(mServiceRule, PanService.class);
         mService = PanService.getPanService();
         Assert.assertNotNull(mService);

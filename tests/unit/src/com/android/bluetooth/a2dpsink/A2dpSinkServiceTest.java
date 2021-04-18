@@ -62,6 +62,7 @@ public class A2dpSinkServiceTest {
         MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         setMaxConnectedAudioDevices(1);
         TestUtils.startService(mServiceRule, A2dpSinkService.class);
         mService = A2dpSinkService.getA2dpSinkService();

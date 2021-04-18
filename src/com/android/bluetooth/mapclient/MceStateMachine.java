@@ -40,6 +40,8 @@
  */
 package com.android.bluetooth.mapclient;
 
+import static android.Manifest.permission.BLUETOOTH_CONNECT;
+
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothDevice;
@@ -99,7 +101,8 @@ class MceStateMachine extends StateMachine {
 
     private static final String TAG = "MceSM";
     private static final Boolean DBG = MapClientService.DBG;
-    private static final int TIMEOUT = 10000;
+    private static final int DISCONNECT_TIMEOUT = 3000;
+    private static final int CONNECT_TIMEOUT = 10000;
     private static final int MAX_MESSAGES = 20;
     private static final int MSG_CONNECT = 1;
     private static final int MSG_DISCONNECT = 2;
@@ -238,7 +241,7 @@ class MceStateMachine extends StateMachine {
         intent.putExtra(BluetoothProfile.EXTRA_STATE, state);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-        mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
     }
 
     public synchronized int getState() {
@@ -286,7 +289,8 @@ class MceStateMachine extends StateMachine {
                     Log.d(TAG, "Scheme " + contact.getScheme());
                 }
                 if (PhoneAccount.SCHEME_TEL.equals(contact.getScheme())) {
-                    if (contact.getPath().contains(Telephony.Threads.CONTENT_URI.toString())) {
+                    String path = contact.getPath();
+                    if (path != null && path.contains(Telephony.Threads.CONTENT_URI.toString())) {
                         mDatabase.addThreadContactsToEntries(bmsg, contact.getLastPathSegment());
                     } else {
                         VCardEntry destEntry = new VCardEntry();
@@ -449,7 +453,7 @@ class MceStateMachine extends StateMachine {
 
             // When commanded to connect begin SDP to find the MAS server.
             mDevice.sdpSearch(BluetoothUuid.MAS);
-            sendMessageDelayed(MSG_CONNECTING_TIMEOUT, TIMEOUT);
+            sendMessageDelayed(MSG_CONNECTING_TIMEOUT, CONNECT_TIMEOUT);
         }
 
         @Override
@@ -622,7 +626,7 @@ class MceStateMachine extends StateMachine {
 
         @Override
         public void exit() {
-            mDatabase.clearMessages();
+            mDatabase.cleanUp();
             mPreviousState = BluetoothProfile.STATE_CONNECTED;
         }
 
@@ -924,7 +928,7 @@ class MceStateMachine extends StateMachine {
             if (mMasClient != null) {
                 mMasClient.makeRequest(new RequestSetNotificationRegistration(false));
                 mMasClient.shutdown();
-                sendMessageDelayed(MSG_DISCONNECTING_TIMEOUT, TIMEOUT);
+                sendMessageDelayed(MSG_DISCONNECTING_TIMEOUT, DISCONNECT_TIMEOUT);
             } else {
                 // MAP was never connected
                 transitionTo(mDisconnected);

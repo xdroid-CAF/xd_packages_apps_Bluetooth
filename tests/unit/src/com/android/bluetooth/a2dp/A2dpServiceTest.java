@@ -93,6 +93,7 @@ public class A2dpServiceTest {
 
         TestUtils.setAdapterService(mAdapterService);
         doReturn(MAX_CONNECTED_AUDIO_DEVICES).when(mAdapterService).getMaxConnectedAudioDevices();
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         doReturn(false).when(mAdapterService).isQuietModeEnabled();
         doReturn(mDatabaseManager).when(mAdapterService).getDatabase();
 

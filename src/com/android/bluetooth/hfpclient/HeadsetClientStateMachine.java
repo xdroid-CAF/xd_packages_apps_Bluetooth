@@ -33,6 +33,8 @@
 
 package com.android.bluetooth.hfpclient;
 
+import static android.Manifest.permission.BLUETOOTH_CONNECT;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadsetClient;
@@ -105,6 +107,7 @@ public class HeadsetClientStateMachine extends StateMachine {
     public static final int EXPLICIT_CALL_TRANSFER = 18;
     public static final int DISABLE_NREC = 20;
     public static final int SEND_VENDOR_AT_COMMAND = 21;
+    public static final int SEND_BIEV = 22;
 
     // internal actions
     private static final int QUERY_CURRENT_CALLS = 50;
@@ -291,6 +294,8 @@ public class HeadsetClientStateMachine extends StateMachine {
                 return "DISABLE_NREC";
             case SEND_VENDOR_AT_COMMAND:
                 return "SEND_VENDOR_AT_COMMAND";
+            case SEND_BIEV:
+                return "SEND_BIEV";
             case QUERY_CURRENT_CALLS:
                 return "QUERY_CURRENT_CALLS";
             case QUERY_OPERATOR_NAME:
@@ -348,7 +353,7 @@ public class HeadsetClientStateMachine extends StateMachine {
         Intent intent = new Intent(BluetoothHeadsetClient.ACTION_CALL_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         intent.putExtra(BluetoothHeadsetClient.EXTRA_CALL, c);
-        mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
     }
 
     private boolean queryCallsStart() {
@@ -1151,6 +1156,7 @@ public class HeadsetClientStateMachine extends StateMachine {
             logD("Enter Connected: " + getCurrentMessage().what);
             mAudioWbs = false;
             mCommandedSpeakerVolume = -1;
+
             if (mPrevState == mConnecting) {
                 broadcastConnectionState(mCurrentDevice, BluetoothProfile.STATE_CONNECTED,
                         BluetoothProfile.STATE_CONNECTING);
@@ -1161,6 +1167,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                 Log.e(TAG, "Connected: Illegal state transition from " + prevStateName
                         + " to Connecting, mCurrentDevice=" + mCurrentDevice);
             }
+            mService.updateBatteryLevel();
         }
 
         @Override
@@ -1236,6 +1243,20 @@ public class HeadsetClientStateMachine extends StateMachine {
                     int vendorId = message.arg1;
                     String atCommand = (String) (message.obj);
                     mVendorProcessor.sendCommand(vendorId, atCommand, mCurrentDevice);
+                    break;
+                }
+
+                case SEND_BIEV: {
+                    if ((mPeerFeatures & HeadsetClientHalConstants.PEER_FEAT_HF_IND)
+                            == HeadsetClientHalConstants.PEER_FEAT_HF_IND) {
+                        int indicatorID = message.arg1;
+                        int value = message.arg2;
+                        mNativeInterface.sendATCmd(getByteAddress(mCurrentDevice),
+                                HeadsetClientHalConstants.HANDSFREECLIENT_AT_CMD_BIEV,
+                                indicatorID,
+                                value,
+                                null);
+                    }
                     break;
                 }
 
@@ -1348,7 +1369,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             }
 
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
 
                             if (mIndicatorNetworkState
                                     == HeadsetClientHalConstants.NETWORK_STATE_AVAILABLE) {
@@ -1367,7 +1388,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_NETWORK_ROAMING,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             break;
                         case StackEvent.EVENT_TYPE_NETWORK_SIGNAL:
                             mIndicatorNetworkSignal = event.valueInt;
@@ -1376,7 +1397,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_NETWORK_SIGNAL_STRENGTH,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             break;
                         case StackEvent.EVENT_TYPE_BATTERY_LEVEL:
                             mIndicatorBatteryLevel = event.valueInt;
@@ -1385,7 +1406,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_BATTERY_LEVEL,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             break;
                         case StackEvent.EVENT_TYPE_OPERATOR_NAME:
                             mOperatorName = event.valueString;
@@ -1394,7 +1415,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_OPERATOR_NAME,
                                     event.valueString);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             break;
                         case StackEvent.EVENT_TYPE_VR_STATE_CHANGED:
                             int oldState = mVoiceRecognitionActive;
@@ -1474,7 +1495,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_SUBSCRIBER_INFO,
                                     mSubscriberInfo);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             break;
                         case StackEvent.EVENT_TYPE_IN_BAND_RINGTONE:
                             intent = new Intent(BluetoothHeadsetClient.ACTION_AG_EVENT);
@@ -1482,7 +1503,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                             intent.putExtra(BluetoothHeadsetClient.EXTRA_IN_BAND_RING,
                                     event.valueInt);
                             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, event.device);
-                            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+                            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
                             logD(event.device.toString() + "onInBandRing" + event.valueInt);
                             break;
                         case StackEvent.EVENT_TYPE_RING_INDICATION:
@@ -1516,7 +1537,7 @@ public class HeadsetClientStateMachine extends StateMachine {
             Intent intent = new Intent(BluetoothHeadsetClient.ACTION_AG_EVENT);
             intent.putExtra(BluetoothHeadsetClient.EXTRA_VOICE_RECOGNITION, newState);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-            mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+            mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
         }
 
         // in Connected state
@@ -1742,11 +1763,7 @@ public class HeadsetClientStateMachine extends StateMachine {
      * @hide
      */
     public synchronized int getConnectionState(BluetoothDevice device) {
-        if (mCurrentDevice == null) {
-            return BluetoothProfile.STATE_DISCONNECTED;
-        }
-
-        if (!mCurrentDevice.equals(device)) {
+        if (device == null || !device.equals(mCurrentDevice)) {
             return BluetoothProfile.STATE_DISCONNECTED;
         }
 
@@ -1777,7 +1794,7 @@ public class HeadsetClientStateMachine extends StateMachine {
             intent.putExtra(BluetoothHeadsetClient.EXTRA_AUDIO_WBS, mAudioWbs);
         }
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
-        mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
         logD("Audio state " + device + ": " + prevState + "->" + newState);
     }
 
@@ -1838,7 +1855,7 @@ public class HeadsetClientStateMachine extends StateMachine {
                 intent.putExtra(BluetoothHeadsetClient.EXTRA_AG_FEATURE_MERGE_AND_DETACH, true);
             }
         }
-        mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
+        mService.sendBroadcast(intent, BLUETOOTH_CONNECT);
     }
 
     boolean isConnected() {

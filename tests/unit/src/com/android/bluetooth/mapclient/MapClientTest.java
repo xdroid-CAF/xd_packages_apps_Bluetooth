@@ -69,6 +69,7 @@ public class MapClientTest {
         MockitoAnnotations.initMocks(this);
         TestUtils.setAdapterService(mAdapterService);
         when(mAdapterService.getDatabase()).thenReturn(mDatabaseManager);
+        doReturn(true, false).when(mAdapterService).isStartedProfile(anyString());
         MapUtils.setMnsService(mMockMnsService);
         TestUtils.startService(mServiceRule, MapClientService.class);
         mService = MapClientService.getMapClientService();
