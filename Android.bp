@@ -118,6 +118,11 @@ android_app {
         "//apex_available:platform",
         "com.android.bluetooth.updatable",
     ],
+    errorprone: {
+        javacflags: [
+            // "-Xep:AndroidFrameworkRequiresPermission:ERROR",
+        ],
+    },
 }
 
 genrule {

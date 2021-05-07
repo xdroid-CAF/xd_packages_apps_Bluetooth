@@ -19,6 +19,8 @@ package com.android.bluetooth.le_audio;
 
 import static android.bluetooth.IBluetoothLeAudio.LE_AUDIO_GROUP_ID_INVALID;
 
+import android.annotation.RequiresPermission;
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothLeAudio;
 import android.bluetooth.BluetoothProfile;
@@ -29,6 +31,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.os.Binder;
 import android.os.HandlerThread;
 import android.os.ParcelUuid;
 import android.util.Log;
@@ -41,6 +44,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ArrayUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,6 +200,7 @@ public class LeAudioService extends ProfileService {
         sLeAudioService = instance;
     }
 
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean connect(BluetoothDevice device) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return false;
@@ -260,6 +265,7 @@ public class LeAudioService extends ProfileService {
      * @param device is the device with which we would like to disconnect LE Audio
      * @return true if profile disconnected, false if device not connected over LE Audio
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean disconnect(BluetoothDevice device) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return false;
@@ -303,6 +309,7 @@ public class LeAudioService extends ProfileService {
         return true;
     }
 
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     List<BluetoothDevice> getConnectedDevices() {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return new ArrayList<>(0);
@@ -318,6 +325,7 @@ public class LeAudioService extends ProfileService {
         }
     }
 
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return new ArrayList<>(0);
@@ -377,6 +385,7 @@ public class LeAudioService extends ProfileService {
      * {@link BluetoothProfile#STATE_CONNECTED} if this profile is connected, or
      * {@link BluetoothProfile#STATE_DISCONNECTING} if this profile is being disconnected
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public int getConnectionState(BluetoothDevice device) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return BluetoothProfile.STATE_DISCONNECTED;
@@ -396,6 +405,7 @@ public class LeAudioService extends ProfileService {
      * @param device the new active device
      * @return true on success, otherwise false
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean setActiveDevice(BluetoothDevice device) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return false;
@@ -412,7 +422,11 @@ public class LeAudioService extends ProfileService {
      *
      * @return the list of active devices.
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     List<BluetoothDevice> getActiveDevices() {
+        if (!Utils.checkConnectPermissionForPreflight(this)) {
+            return Collections.emptyList();
+        }
         if (DBG) {
             Log.d(TAG, "getActiveDevices");
         }
@@ -420,6 +434,8 @@ public class LeAudioService extends ProfileService {
         return activeDevices;
     }
 
+    // Suppressed since this is part of a local process
+    @SuppressLint("AndroidFrameworkRequiresPermission")
     void messageFromNative(LeAudioStackEvent stackEvent) {
         Log.d(TAG, "Message from native: " + stackEvent);
         BluetoothDevice device = stackEvent.device;
@@ -563,6 +579,7 @@ public class LeAudioService extends ProfileService {
         }
     }
 
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     private List<BluetoothDevice> getConnectedPeerDevices(int groupId) {
         List<BluetoothDevice> result = new ArrayList<>();
         for (BluetoothDevice peerDevice : getConnectedDevices()) {
@@ -574,6 +591,7 @@ public class LeAudioService extends ProfileService {
     }
 
     @VisibleForTesting
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     synchronized void connectionStateChanged(BluetoothDevice device, int fromState,
                                                      int toState) {
         if ((device == null) || (fromState == toState)) {
@@ -631,6 +649,7 @@ public class LeAudioService extends ProfileService {
      * @param device the peer device to connect to
      * @return true if connection is allowed, otherwise false
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public boolean okToConnect(BluetoothDevice device) {
         // Check if this is an incoming connection in Quiet mode.
         if (mAdapterService.isQuietModeEnabled()) {
@@ -669,6 +688,10 @@ public class LeAudioService extends ProfileService {
      * @param connectionPolicy is the connection policy to set to for this profile
      * @return true on success, otherwise false
      */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.BLUETOOTH_CONNECT,
+            android.Manifest.permission.BLUETOOTH_PRIVILEGED,
+    })
     public boolean setConnectionPolicy(BluetoothDevice device, int connectionPolicy) {
         enforceCallingOrSelfPermission(BLUETOOTH_PRIVILEGED,
                 "Need BLUETOOTH_PRIVILEGED permission");
@@ -700,6 +723,7 @@ public class LeAudioService extends ProfileService {
      * @return connection policy of the device
      * @hide
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public int getConnectionPolicy(BluetoothDevice device) {
         if (!Utils.checkConnectPermissionForPreflight(this)) {
             return BluetoothProfile.CONNECTION_POLICY_UNKNOWN;
@@ -714,7 +738,11 @@ public class LeAudioService extends ProfileService {
      * @param device LE Audio capable device
      * @return group id that this device currently belongs to
      */
+    @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     public int getGroupId(BluetoothDevice device) {
+        if (!Utils.checkConnectPermissionForPreflight(this)) {
+            return LE_AUDIO_GROUP_ID_INVALID;
+        }
         if (device == null) {
             return LE_AUDIO_GROUP_ID_INVALID;
         }
