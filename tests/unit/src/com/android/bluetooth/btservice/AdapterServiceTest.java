@@ -34,6 +34,7 @@ import android.content.pm.PermissionInfo;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
@@ -183,7 +184,7 @@ public class AdapterServiceTest {
         mAdapterService.attach(mMockContext, null, null, null, mApplication, null);
 
         mAdapterService.onCreate();
-        mServiceBinder.registerCallback(mIBluetoothCallback);
+        mServiceBinder.registerCallback(mIBluetoothCallback, mAttributionSource);
 
         Config.init(mMockContext);
 
@@ -193,7 +194,7 @@ public class AdapterServiceTest {
 
     @After
     public void tearDown() {
-        mServiceBinder.unregisterCallback(mIBluetoothCallback);
+        mServiceBinder.unregisterCallback(mIBluetoothCallback, mAttributionSource);
         mAdapterService.cleanup();
         Config.init(InstrumentationRegistry.getTargetContext());
     }
@@ -226,7 +227,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_ON, BluetoothAdapter.STATE_BLE_ON,
                 invocationNumber + 1, NATIVE_INIT_MS);
 
-        mServiceBinder.onLeServiceUp();
+        mServiceBinder.onLeServiceUp(mAttributionSource);
 
         verifyStateChange(BluetoothAdapter.STATE_BLE_ON, BluetoothAdapter.STATE_TURNING_ON,
                 invocationNumber + 1, CONTEXT_SWITCH_MS);
@@ -246,7 +247,7 @@ public class AdapterServiceTest {
 
         verify(mMockContext, timeout(CONTEXT_SWITCH_MS).times(2 * invocationNumber + 2))
                 .sendBroadcast(any(), eq(BLUETOOTH_SCAN),
-                        same(Utils.sTempAllowlistBroadcastOptions));
+                        any(Bundle.class));
         final int scanMode = mServiceBinder.getScanMode(mAttributionSource);
         Assert.assertTrue(scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE
                 || scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE);
@@ -274,7 +275,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_BLE_ON,
                 invocationNumber + 1, PROFILE_SERVICE_TOGGLE_TIME_MS);
 
-        mServiceBinder.onBrEdrDown();
+        mServiceBinder.onBrEdrDown(mAttributionSource);
 
         verifyStateChange(BluetoothAdapter.STATE_BLE_ON, BluetoothAdapter.STATE_BLE_TURNING_OFF,
                 invocationNumber + 1, CONTEXT_SWITCH_MS);
@@ -388,7 +389,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_BLE_ON, 1,
                 CONTEXT_SWITCH_MS);
 
-        mServiceBinder.onBrEdrDown();
+        mServiceBinder.onBrEdrDown(mAttributionSource);
 
         verifyStateChange(BluetoothAdapter.STATE_BLE_ON, BluetoothAdapter.STATE_BLE_TURNING_OFF, 1,
                 CONTEXT_SWITCH_MS);
@@ -423,7 +424,7 @@ public class AdapterServiceTest {
         verifyStateChange(BluetoothAdapter.STATE_BLE_TURNING_ON, BluetoothAdapter.STATE_BLE_ON, 1,
                 NATIVE_INIT_MS);
 
-        mServiceBinder.onLeServiceUp();
+        mServiceBinder.onLeServiceUp(mAttributionSource);
 
         verifyStateChange(BluetoothAdapter.STATE_BLE_ON, BluetoothAdapter.STATE_TURNING_ON, 1,
                 CONTEXT_SWITCH_MS);
@@ -655,7 +656,7 @@ public class AdapterServiceTest {
         byte[] obfuscatedAddress1 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress1.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress1));
-        mServiceBinder.factoryReset();
+        mServiceBinder.factoryReset(mAttributionSource);
         byte[] obfuscatedAddress2 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress2.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress2));
@@ -667,7 +668,7 @@ public class AdapterServiceTest {
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress3));
         Assert.assertArrayEquals(obfuscatedAddress3,
                 obfuscatedAddress2);
-        mServiceBinder.factoryReset();
+        mServiceBinder.factoryReset(mAttributionSource);
         byte[] obfuscatedAddress4 = mAdapterService.obfuscateAddress(device);
         Assert.assertTrue(obfuscatedAddress4.length > 0);
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress4));
@@ -691,7 +692,7 @@ public class AdapterServiceTest {
         Assert.assertFalse(isByteArrayAllZero(obfuscatedAddress1));
         Assert.assertArrayEquals(obfuscateInJava(metricsSalt1, device),
                 obfuscatedAddress1);
-        mServiceBinder.factoryReset();
+        mServiceBinder.factoryReset(mAttributionSource);
         tearDown();
         setUp();
         // Cannot verify metrics salt since it is not written to disk until native cleanup
