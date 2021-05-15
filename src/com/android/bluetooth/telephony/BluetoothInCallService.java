@@ -314,8 +314,6 @@ public class BluetoothInCallService extends InCallService {
 
     public BluetoothInCallService() {
         Log.i(TAG, "BluetoothInCallService is created");
-        BluetoothAdapter.getDefaultAdapter()
-                .getProfileProxy(this, mProfileListener, BluetoothProfile.HEADSET);
         sInstance = this;
     }
 
@@ -350,6 +348,13 @@ public class BluetoothInCallService extends InCallService {
             BluetoothCall call = mCallInfo.getForegroundCall();
             if (mCallInfo.isNullCall(call)) {
                 return false;
+            }
+            // release the parent if there is a conference call
+            BluetoothCall conferenceCall = getBluetoothCallById(call.getParentId());
+            if (!mCallInfo.isNullCall(conferenceCall)
+                    && conferenceCall.getState() == Call.STATE_ACTIVE) {
+                Log.i(TAG, "BT - hanging up conference call");
+                call = conferenceCall;
             }
             call.disconnect();
             return true;
@@ -535,6 +540,8 @@ public class BluetoothInCallService extends InCallService {
     public void onCreate() {
         Log.d(TAG, "onCreate");
         super.onCreate();
+        BluetoothAdapter.getDefaultAdapter()
+                .getProfileProxy(this, mProfileListener, BluetoothProfile.HEADSET);
         mBluetoothAdapterReceiver = new BluetoothAdapterReceiver();
         IntentFilter intentFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(mBluetoothAdapterReceiver, intentFilter);
