@@ -16,7 +16,8 @@
 
 package com.android.bluetooth.btservice;
 
-import static android.Manifest.permission.BLUETOOTH_CONNECT;
+import static android.Manifest.permission.BLUETOOTH_SCAN;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -25,6 +26,7 @@ import android.app.admin.DevicePolicyManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.IBluetoothCallback;
+import android.content.AttributionSource;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -92,10 +94,14 @@ public class AdapterServiceTest {
     private @Mock android.app.Application mApplication;
 
     private static final int CONTEXT_SWITCH_MS = 100;
+    private static final int PROFILE_SERVICE_TOGGLE_TIME_MS = 200;
     private static final int GATT_START_TIME_MS = 500;
     private static final int ONE_SECOND_MS = 1000;
     private static final int NATIVE_INIT_MS = 8000;
     private static final int NATIVE_DISABLE_MS = 1000;
+
+    private final AttributionSource mAttributionSource = new AttributionSource.Builder(
+            Process.myUid()).build();
 
     private PowerManager mPowerManager;
     private PackageManager mMockPackageManager;
@@ -152,6 +158,7 @@ public class AdapterServiceTest {
         when(mMockContext.getSystemService(Context.POWER_SERVICE)).thenReturn(mPowerManager);
         when(mMockContext.getSystemService(Context.ALARM_SERVICE)).thenReturn(mMockAlarmManager);
         when(mMockContext.getSystemService(Context.AUDIO_SERVICE)).thenReturn(mAudioManager);
+        when(mMockContext.getAttributionSource()).thenReturn(mAttributionSource);
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();
             return InstrumentationRegistry.getTargetContext().getDatabasePath((String) args[0]);
@@ -235,11 +242,12 @@ public class AdapterServiceTest {
         }
 
         verifyStateChange(BluetoothAdapter.STATE_TURNING_ON, BluetoothAdapter.STATE_ON,
-                invocationNumber + 1, CONTEXT_SWITCH_MS);
+                invocationNumber + 1, PROFILE_SERVICE_TOGGLE_TIME_MS);
 
         verify(mMockContext, timeout(CONTEXT_SWITCH_MS).times(2 * invocationNumber + 2))
-                .sendBroadcast(any(), eq(BLUETOOTH_CONNECT));
-        final int scanMode = mServiceBinder.getScanMode();
+                .sendBroadcast(any(), eq(BLUETOOTH_SCAN),
+                        same(Utils.sTempAllowlistBroadcastOptions));
+        final int scanMode = mServiceBinder.getScanMode(mAttributionSource);
         Assert.assertTrue(scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE
                 || scanMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE);
         Assert.assertTrue(mAdapterService.getState() == BluetoothAdapter.STATE_ON);
@@ -264,7 +272,7 @@ public class AdapterServiceTest {
         }
 
         verifyStateChange(BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_BLE_ON,
-                invocationNumber + 1, CONTEXT_SWITCH_MS);
+                invocationNumber + 1, PROFILE_SERVICE_TOGGLE_TIME_MS);
 
         mServiceBinder.onBrEdrDown();
 
