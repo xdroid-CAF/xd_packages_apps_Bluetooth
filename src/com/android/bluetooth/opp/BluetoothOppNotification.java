@@ -49,6 +49,7 @@ import android.text.format.Formatter;
 import android.util.Log;
 
 import com.android.bluetooth.R;
+import com.android.bluetooth.Utils;
 
 import java.util.HashMap;
 
@@ -349,7 +350,8 @@ class BluetoothOppNotification {
                 intent.putExtra(Constants.EXTRA_BT_OPP_TRANSFER_ID, item.id);
                 intent.putExtra(Constants.EXTRA_BT_OPP_TRANSFER_PROGRESS, progress);
                 intent.putExtra(Constants.EXTRA_BT_OPP_ADDRESS, item.destination);
-                mContext.sendBroadcast(intent, Constants.HANDOVER_STATUS_PERMISSION);
+                mContext.sendBroadcast(intent, Constants.HANDOVER_STATUS_PERMISSION,
+                        Utils.getTempAllowlistBroadcastOptions());
                 continue;
             }
             // Build the notification object
@@ -561,6 +563,7 @@ class BluetoothOppNotification {
             BluetoothOppTransferInfo info = new BluetoothOppTransferInfo();
             BluetoothOppUtility.fillRecord(mContext, cursor, info);
             Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + info.mID);
+            String fileNameSafe = info.mFileName.replaceAll("\\s", "_");
             Intent baseIntent = new Intent().setDataAndNormalize(contentUri)
                     .setClassName(Constants.THIS_PACKAGE_NAME,
                             BluetoothOppReceiver.class.getName());
@@ -604,10 +607,10 @@ class BluetoothOppNotification {
                                             mContext.getTheme()))
                             .setContentTitle(mContext.getText(
                                     R.string.incoming_file_confirm_Notification_title))
-                            .setContentText(info.mFileName)
+                            .setContentText(fileNameSafe)
                             .setStyle(new Notification.BigTextStyle().bigText(mContext.getString(
                                     R.string.incoming_file_confirm_Notification_content,
-                                    info.mDeviceName, info.mFileName)))
+                                    info.mDeviceName, fileNameSafe)))
                             .setSubText(Formatter.formatFileSize(mContext, info.mTotalBytes))
                             .setSmallIcon(R.drawable.bt_incomming_file_notification)
                             .setLocalOnly(true)
@@ -633,10 +636,10 @@ class BluetoothOppNotification {
                                             mContext.getTheme()))
                             .setContentTitle(mContext.getText(
                                     R.string.incoming_file_confirm_Notification_title))
-                            .setContentText(info.mFileName)
+                            .setContentText(fileNameSafe)
                             .setStyle(new Notification.BigTextStyle().bigText(mContext.getString(
                                     R.string.incoming_file_confirm_Notification_content,
-                                    info.mDeviceName, info.mFileName)))
+                                    info.mDeviceName, fileNameSafe)))
                             .setSubText(Formatter.formatFileSize(mContext, info.mTotalBytes))
                             .setSmallIcon(R.drawable.bt_incomming_file_notification)
                             .setLocalOnly(true)
