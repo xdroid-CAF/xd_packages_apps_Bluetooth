@@ -923,12 +923,18 @@ public final class Utils {
     }
 
     public static @NonNull Bundle getTempAllowlistBroadcastOptions() {
-        final long durationMs = DeviceConfig.getLong(DeviceConfig.NAMESPACE_BLUETOOTH,
-                KEY_TEMP_ALLOW_LIST_DURATION_MS, DEFAULT_TEMP_ALLOW_LIST_DURATION_MS);
+        // Use the Bluetooth process identity to pass permission check when reading DeviceConfig
+        final long ident = Binder.clearCallingIdentity();
         final BroadcastOptions bOptions = BroadcastOptions.makeBasic();
-        bOptions.setTemporaryAppAllowlist(durationMs,
-                TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED,
-                PowerExemptionManager.REASON_BLUETOOTH_BROADCAST, "");
+        try {
+            final long durationMs = DeviceConfig.getLong(DeviceConfig.NAMESPACE_BLUETOOTH,
+                    KEY_TEMP_ALLOW_LIST_DURATION_MS, DEFAULT_TEMP_ALLOW_LIST_DURATION_MS);
+            bOptions.setTemporaryAppAllowlist(durationMs,
+                    TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED,
+                    PowerExemptionManager.REASON_BLUETOOTH_BROADCAST, "");
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
         return bOptions.toBundle();
     }
 }
