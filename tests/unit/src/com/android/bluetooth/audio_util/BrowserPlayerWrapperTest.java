@@ -39,8 +39,6 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
-import com.android.bluetooth.R;
-
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -70,7 +68,6 @@ public class BrowserPlayerWrapperTest {
     private HandlerThread mThread;
 
     @Mock Context mMockContext;
-    @Mock Resources mMockResources;
     private Context mTargetContext;
     private Resources mTestResources;
     private MockContentResolver mTestContentResolver;
@@ -117,8 +114,6 @@ public class BrowserPlayerWrapperTest {
         });
 
         when(mMockContext.getContentResolver()).thenReturn(mTestContentResolver);
-        when(mMockResources.getBoolean(R.bool.avrcp_target_cover_art_uri_images)).thenReturn(true);
-        when(mMockContext.getResources()).thenReturn(mMockResources);
 
         // Set up Looper thread for the timeout handler
         mThread = new HandlerThread("MediaPlayerWrapperTestThread");

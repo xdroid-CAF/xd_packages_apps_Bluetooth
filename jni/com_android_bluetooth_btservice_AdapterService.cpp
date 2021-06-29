@@ -1162,7 +1162,7 @@ static jboolean set_data(JNIEnv* env, bt_oob_data_t& oob_data, jobject oobData,
     oob_data.le_device_role = leRole;
 
     jint leFlag =
-        callIntGetter(env, oobData, "android/bluetooth/OobData", "getLeFlags");
+        callIntGetter(env, oobData, "android/bluetooth/OobData", "getLeFlag");
     oob_data.le_flags = leFlag;
   }
   return JNI_TRUE;
@@ -1213,32 +1213,22 @@ static jboolean createBondOutOfBandNative(JNIEnv* env, jobject obj,
     return JNI_FALSE;
   }
 
-  jbyte* addr = env->GetByteArrayElements(address, NULL);
-  if (addr == NULL) {
+  // Convert P192 data from Java POJO to C Struct
+  bt_oob_data_t p192_data;
+  if (set_data(env, p192_data, p192Data, transport) == JNI_FALSE) {
     jniThrowIOException(env, EINVAL);
     return JNI_FALSE;
   }
 
-  // Convert P192 data from Java POJO to C Struct
-  bt_oob_data_t p192_data;
-  if (p192Data != NULL) {
-    if (set_data(env, p192_data, p192Data, transport) == JNI_FALSE) {
-      jniThrowIOException(env, EINVAL);
-      return JNI_FALSE;
-    }
-  }
-
   // Convert P256 data from Java POJO to C Struct
   bt_oob_data_t p256_data;
-  if (p256Data != NULL) {
-    if (set_data(env, p256_data, p256Data, transport) == JNI_FALSE) {
-      jniThrowIOException(env, EINVAL);
-      return JNI_FALSE;
-    }
+  if (set_data(env, p256_data, p256Data, transport) == JNI_FALSE) {
+    jniThrowIOException(env, EINVAL);
+    return JNI_FALSE;
   }
 
   return ((sBluetoothInterface->create_bond_out_of_band(
-              (RawAddress*)addr, transport, &p192_data, &p256_data)) ==
+              (RawAddress*)address, transport, &p192_data, &p256_data)) ==
           BT_STATUS_SUCCESS)
              ? JNI_TRUE
              : JNI_FALSE;

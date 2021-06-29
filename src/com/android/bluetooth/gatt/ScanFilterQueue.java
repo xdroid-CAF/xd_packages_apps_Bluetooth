@@ -50,7 +50,6 @@ import java.util.UUID;
         public byte type;
         public String address;
         public byte addr_type;
-        public byte[] irk;
         public UUID uuid;
         public UUID uuid_mask;
         public String name;
@@ -62,12 +61,11 @@ import java.util.UUID;
 
     private Set<Entry> mEntries = new HashSet<Entry>();
 
-    void addDeviceAddress(String address, byte type, byte[] irk) {
+    void addDeviceAddress(String address, byte type) {
         Entry entry = new Entry();
         entry.type = TYPE_DEVICE_ADDRESS;
         entry.address = address;
         entry.addr_type = type;
-        entry.irk = irk;
         mEntries.add(entry);
     }
 
@@ -181,13 +179,7 @@ import java.util.UUID;
             addName(filter.getDeviceName());
         }
         if (filter.getDeviceAddress() != null) {
-            byte addressType = (byte) filter.getAddressType();
-            // If addressType == iADDRESS_TYPE_PUBLIC (0) then this is the original
-            // setDeviceAddress(address) API path which provided DEVICE_TYPE_ALL (2) which might map
-            // to the stack value for address type of BTM_BLE_STATIC (2)
-            // Additionally, we shouldn't confuse device type with address type.
-            addDeviceAddress(filter.getDeviceAddress(),
-                    ((addressType == 0) ? DEVICE_TYPE_ALL : addressType), filter.getIrk());
+            addDeviceAddress(filter.getDeviceAddress(), DEVICE_TYPE_ALL);
         }
         if (filter.getServiceUuid() != null) {
             if (filter.getServiceUuidMask() == null) {

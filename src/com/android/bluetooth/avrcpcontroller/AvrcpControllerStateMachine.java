@@ -949,10 +949,8 @@ class AvrcpControllerStateMachine extends StateMachine {
         public void enter() {
             disconnectCoverArt();
             onBrowsingDisconnected();
-            if (mService.sBrowseTree != null) {
-                mService.sBrowseTree.mRootNode.removeChild(mBrowseTree.mRootNode);
-                BluetoothMediaBrowserService.notifyChanged(mService.sBrowseTree.mRootNode);
-            }
+            mService.sBrowseTree.mRootNode.removeChild(mBrowseTree.mRootNode);
+            BluetoothMediaBrowserService.notifyChanged(mService.sBrowseTree.mRootNode);
             broadcastConnectionStateChanged(BluetoothProfile.STATE_DISCONNECTING);
             transitionTo(mDisconnected);
         }

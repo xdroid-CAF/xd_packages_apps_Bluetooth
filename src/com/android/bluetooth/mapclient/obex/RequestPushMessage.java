@@ -17,7 +17,6 @@
 package com.android.bluetooth.mapclient;
 
 import com.android.bluetooth.mapclient.MasClient.CharsetType;
-import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -27,8 +26,7 @@ import javax.obex.HeaderSet;
 import javax.obex.ResponseCodes;
 
 /* Place a message into current directory on MSE. */
-@VisibleForTesting
-public class RequestPushMessage extends Request {
+final class RequestPushMessage extends Request {
 
     private static final String TYPE = "x-bt/message";
     private Bmessage mMsg;
