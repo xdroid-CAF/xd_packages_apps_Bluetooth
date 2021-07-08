@@ -33,14 +33,17 @@ import android.content.pm.PackageManager;
 import android.content.pm.PermissionInfo;
 import android.content.res.Resources;
 import android.media.AudioManager;
+import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.permission.PermissionCheckerManager;
 import android.test.mock.MockContentResolver;
 import android.util.Log;
 
@@ -105,6 +108,7 @@ public class AdapterServiceTest {
             Process.myUid()).build();
 
     private PowerManager mPowerManager;
+    private PermissionCheckerManager mPermissionCheckerManager;
     private PackageManager mMockPackageManager;
     private MockContentResolver mMockContentResolver;
     private HashMap<String, HashMap<String, String>> mAdapterConfig;
@@ -133,6 +137,12 @@ public class AdapterServiceTest {
         }
         Assert.assertNotNull(Looper.myLooper());
 
+        // Dispatch all async work through instrumentation so we can wait until
+        // it's drained below
+        AsyncTask.setDefaultExecutor((r) -> {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(r);
+        });
+
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 () -> mAdapterService = new AdapterService());
         mServiceBinder = new AdapterService.AdapterServiceBinder(mAdapterService);
@@ -144,6 +154,8 @@ public class AdapterServiceTest {
         MockitoAnnotations.initMocks(this);
         mPowerManager = (PowerManager) InstrumentationRegistry.getTargetContext()
                 .getSystemService(Context.POWER_SERVICE);
+        mPermissionCheckerManager = InstrumentationRegistry.getTargetContext()
+                .getSystemService(PermissionCheckerManager.class);
 
         when(mMockContext.getApplicationInfo()).thenReturn(mMockApplicationInfo);
         when(mMockContext.getContentResolver()).thenReturn(mMockContentResolver);
@@ -157,6 +169,10 @@ public class AdapterServiceTest {
         when(mMockContext.getSystemService(Context.DEVICE_POLICY_SERVICE)).thenReturn(
                 mMockDevicePolicyManager);
         when(mMockContext.getSystemService(Context.POWER_SERVICE)).thenReturn(mPowerManager);
+        when(mMockContext.getSystemServiceName(PermissionCheckerManager.class))
+                .thenReturn(Context.PERMISSION_CHECKER_SERVICE);
+        when(mMockContext.getSystemService(PermissionCheckerManager.class))
+                .thenReturn(mPermissionCheckerManager);
         when(mMockContext.getSystemService(Context.ALARM_SERVICE)).thenReturn(mMockAlarmManager);
         when(mMockContext.getSystemService(Context.AUDIO_SERVICE)).thenReturn(mAudioManager);
         when(mMockContext.getAttributionSource()).thenReturn(mAttributionSource);
@@ -182,8 +198,11 @@ public class AdapterServiceTest {
 
         // Attach a context to the service for permission checks.
         mAdapterService.attach(mMockContext, null, null, null, mApplication, null);
-
         mAdapterService.onCreate();
+
+        // Wait for any async events to drain
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+
         mServiceBinder.registerCallback(mIBluetoothCallback, mAttributionSource);
 
         Config.init(mMockContext);
