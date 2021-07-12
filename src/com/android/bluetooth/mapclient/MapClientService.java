@@ -46,7 +46,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MapClientService extends ProfileService {
@@ -59,7 +58,8 @@ public class MapClientService extends ProfileService {
 
     private Map<BluetoothDevice, MceStateMachine> mMapInstanceMap = new ConcurrentHashMap<>(1);
     private MnsService mMnsServer;
-    private BluetoothAdapter mAdapter;
+
+    private AdapterService mAdapterService;
     private DatabaseManager mDatabaseManager;
     private static MapClientService sMapClientService;
     private MapBroadcastReceiver mMapReceiver;
@@ -205,7 +205,7 @@ public class MapClientService extends ProfileService {
     public synchronized List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
         if (DBG) Log.d(TAG, "getDevicesMatchingConnectionStates" + Arrays.toString(states));
         List<BluetoothDevice> deviceList = new ArrayList<>();
-        Set<BluetoothDevice> bondedDevices = mAdapter.getBondedDevices();
+        BluetoothDevice[] bondedDevices = mAdapterService.getBondedDevices();
         int connectionState;
         for (BluetoothDevice device : bondedDevices) {
             connectionState = getConnectionState(device);
@@ -290,7 +290,7 @@ public class MapClientService extends ProfileService {
     }
 
     @Override
-    protected IProfileServiceBinder initBinder() {
+    public IProfileServiceBinder initBinder() {
         return new Binder(this);
     }
 
@@ -298,6 +298,7 @@ public class MapClientService extends ProfileService {
     protected synchronized boolean start() {
         Log.e(TAG, "start()");
 
+        mAdapterService = AdapterService.getAdapterService();
         mDatabaseManager = Objects.requireNonNull(AdapterService.getAdapterService().getDatabase(),
                 "DatabaseManager cannot be null when MapClientService starts");
 
@@ -310,14 +311,13 @@ public class MapClientService extends ProfileService {
             }
         }
 
-        mAdapter = BluetoothAdapter.getDefaultAdapter();
-
         mMapReceiver = new MapBroadcastReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_SDP_RECORD);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         registerReceiver(mMapReceiver, filter);
         removeUncleanAccounts();
+        MapClientContent.clearAllContent(this);
         setMapClientService(this);
         return true;
     }
@@ -461,7 +461,7 @@ public class MapClientService extends ProfileService {
 
         @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
         private MapClientService getService(AttributionSource source) {
-            if (!Utils.checkCallerIsSystemOrActiveUser(TAG)
+            if (!(MapUtils.isSystemUser() || Utils.checkCallerIsSystemOrActiveUser(TAG))
                     || !Utils.checkServiceAvailable(mService, TAG)
                     || !Utils.checkConnectPermissionForDataDelivery(mService, source, TAG)) {
                 return null;
@@ -635,8 +635,7 @@ public class MapClientService extends ProfileService {
                 return;
             }
             if (DBG) {
-                Log.d(TAG, "broadcast has device: (" + device.getAddress() + ", "
-                        + device.getName() + ")");
+                Log.d(TAG, "broadcast has device: (" + device.getAddress() + ")");
             }
             MceStateMachine stateMachine = mMapInstanceMap.get(device);
             if (stateMachine == null) {
