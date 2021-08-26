@@ -30,6 +30,7 @@ import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_FOREGRO
 
 import android.Manifest;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.app.AppGlobals;
@@ -62,6 +63,7 @@ import android.provider.DeviceConfig;
 import android.provider.Telephony;
 import android.util.Log;
 
+import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.btservice.ProfileService;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -111,6 +113,15 @@ public final class Utils {
 
     private static boolean isToneWait(char c) {
         return c == 'w' || c == 'W';
+    }
+
+    public static @Nullable String getName(@Nullable BluetoothDevice device) {
+        final AdapterService service = AdapterService.getAdapterService();
+        if (service != null && device != null) {
+            return service.getRemoteName(device);
+        } else {
+            return null;
+        }
     }
 
     public static String getAddressStringFromByte(byte[] address) {
@@ -436,7 +447,8 @@ public final class Utils {
     @SuppressLint("AndroidFrameworkRequiresPermission")
     private static boolean checkPermissionForDataDelivery(Context context, String permission,
             AttributionSource attributionSource, String message) {
-        attributionSource.enforceCallingUid();
+        // STOPSHIP(b/188391719): enable this security enforcement
+        // attributionSource.enforceCallingUid();
         final int result = PermissionChecker.checkPermissionForDataDeliveryFromDataSource(
                 context, permission, PID_UNKNOWN,
                 new AttributionSource(context.getAttributionSource(), attributionSource), message);
@@ -677,7 +689,8 @@ public final class Utils {
             return false;
         }
 
-        attributionSource.enforceCallingUid();
+        // STOPSHIP(b/188391719): enable this security enforcement
+        // attributionSource.enforceCallingUid();
         if (PermissionChecker.checkPermissionForDataDeliveryFromDataSource(
                 context, ACCESS_COARSE_LOCATION, PID_UNKNOWN,
                 new AttributionSource(context.getAttributionSource(), attributionSource),
@@ -704,7 +717,8 @@ public final class Utils {
             return false;
         }
 
-        attributionSource.enforceCallingUid();
+        // STOPSHIP(b/188391719): enable this security enforcement
+        // attributionSource.enforceCallingUid();
         if (PermissionChecker.checkPermissionForDataDeliveryFromDataSource(
                 context, ACCESS_FINE_LOCATION, PID_UNKNOWN,
                 new AttributionSource(context.getAttributionSource(), attributionSource),
@@ -737,7 +751,8 @@ public final class Utils {
             return false;
         }
 
-        attributionSource.enforceCallingUid();
+        // STOPSHIP(b/188391719): enable this security enforcement
+        // attributionSource.enforceCallingUid();
         if (PermissionChecker.checkPermissionForDataDeliveryFromDataSource(
                 context, ACCESS_FINE_LOCATION, PID_UNKNOWN,
                 new AttributionSource(context.getAttributionSource(), attributionSource),
